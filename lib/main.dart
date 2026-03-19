@@ -33,24 +33,28 @@ class _FitKartAppState extends State<FitKartApp> {
   void initState() {
     super.initState();
     _determineStartScreen();
-    // Only listen for sign-out to send user back to onboarding
+
+    // Listen for sign-out only — sign-in is handled by _determineStartScreen
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.signedOut) {
         if (mounted) setState(() => _showMain = false);
       }
-      // NOTE: We do NOT react to signedIn here.
-      // Navigation after sign-in is controlled by the onboarding flow itself
-      // via _onOnboardingComplete(), which is called only after the full
-      // 6-screen flow completes (or when user explicitly skips).
     });
   }
 
   Future<void> _determineStartScreen() async {
+    // Small delay to let Supabase process OAuth ?code= from URL
+    await Future.delayed(const Duration(milliseconds: 500));
+
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_complete') ?? false;
     final isLoggedIn = Supabase.instance.client.auth.currentUser != null;
-    // Go to main ONLY if user previously completed the full onboarding
-    if (mounted) setState(() => _showMain = isLoggedIn && onboardingDone);
+
+    debugPrint('isLoggedIn: \$isLoggedIn, onboardingDone: \$onboardingDone');
+
+    if (mounted) {
+      setState(() => _showMain = isLoggedIn && onboardingDone);
+    }
   }
 
   Future<void> _onOnboardingComplete() async {

@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FitKart Admin — Command Centre</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:        #f8f9fa;
+  --bg2:       #ffffff;
+  --bg3:       #f0f7f8;
+  --bg4:       #e0f0f2;
+  --card:      #ffffff;
+  --border:    rgba(2,128,144,0.15);
+  --border2:   rgba(2,128,144,0.25);
+  --orange:    #028090;
+  --orange-l:  #00A896;
+  --orange-d:  rgba(2,128,144,0.10);
+  --orange-b:  rgba(2,128,144,0.30);
+  --blue:      #2563EB;
+  --blue-l:    #3B82F6;
+  --blue-d:    rgba(37,99,235,0.15);
+  --green:     #10B981;
+  --green-d:   rgba(16,185,129,0.15);
+  --red:       #EF4444;
+  --red-d:     rgba(239,68,68,0.15);
+  --yellow:    #FBBF24;
+  --yellow-d:  rgba(251,191,36,0.15);
+  --pink:      #EC4899;
+  --pink-d:    rgba(236,72,153,0.15);
+  --purple:    #8B5CF6;
+  --purple-d:  rgba(139,92,246,0.15);
+  --txt:       #1a1a1a;
+  --txt2:      #555555;
+  --txt3:      #888888;
+  --sidebar-w: 240px;
+  --topbar-h:  64px;
+}
+html{scroll-behavior:smooth;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;overflow-x:hidden;}
+
+/* ══ LAYOUT ════════════════════════════════════════ */
+.layout{display:flex;min-height:100vh;}
+.sidebar{width:var(--sidebar-w);background:var(--bg2);border-right:1px solid var(--border);position:fixed;top:0;left:0;height:100vh;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;z-index:100;transition:transform .3s;}
+.main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{height:var(--topbar-h);background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;display:flex;align-items:center;padding:0 28px;gap:16px;}
+.content{flex:1;padding:28px;overflow-x:hidden;}
+
+/* ══ SIDEBAR ═══════════════════════════════════════ */
+.sb-logo{padding:22px 20px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
+.sb-logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#028090,#00A896);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.sb-logo-text{font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;color:var(--txt);line-height:1.2;}
+.sb-logo-sub{font-size:10px;color:var(--txt3);font-weight:500;}
+.sb-section{padding:16px 12px 4px;font-size:10px;font-weight:700;color:var(--txt3);letter-spacing:1px;text-transform:uppercase;}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;cursor:pointer;margin:1px 8px;font-size:13px;font-weight:500;color:var(--txt2);transition:all .18s;position:relative;}
+.sb-item:hover{background:var(--bg3);color:var(--txt);}
+.sb-item.active{background:var(--orange-d);color:var(--orange);}
+.sb-item.active::before{content:'';position:absolute;left:-8px;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--orange);border-radius:0 3px 3px 0;}
+.sb-item svg{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.8;}
+.sb-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;}
+.sb-badge.orange{background:var(--orange);}
+.sb-footer{margin-top:auto;padding:16px 12px;border-top:1px solid var(--border);}
+.sb-user{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;cursor:pointer;}
+.sb-avatar{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#028090,#00A896);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;}
+
+/* ══ TOPBAR ════════════════════════════════════════ */
+.tb-search{flex:1;max-width:380px;position:relative;}
+.tb-search input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:9px 14px 9px 38px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--txt);outline:none;transition:border-color .2s;}
+.tb-search input:focus{border-color:var(--orange-b);}
+.tb-search input::placeholder{color:var(--txt3);}
+.tb-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--txt3);fill:none;stroke-width:1.8;}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.tb-btn{width:36px;height:36px;border-radius:9px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:background .18s;}
+.tb-btn:hover{background:var(--bg4);}
+.tb-btn svg{width:17px;height:17px;stroke:var(--txt2);fill:none;stroke-width:1.8;}
+.notif-dot{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--red);border:1.5px solid var(--bg2);}
+.tb-avatar{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#028090,#00A896);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;cursor:pointer;}
+.tb-live{display:flex;align-items:center;gap:6px;background:var(--green-d);border:1px solid rgba(16,185,129,0.3);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--green);}
+.tb-live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.8);}}
+
+/* ══ PANELS (pages) ════════════════════════════════ */
+.panel{display:none;}
+.panel.active{display:block;}
+.panel-title{font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;color:var(--txt);margin-bottom:4px;}
+.panel-sub{font-size:13px;color:var(--txt2);margin-bottom:24px;}
+
+/* ══ STAT CARDS ════════════════════════════════════ */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;}
+.stat-card:hover{border-color:var(--border2);}
+.stat-card::before{content:'';position:absolute;inset:0;border-radius:16px;opacity:0;transition:opacity .2s;}
+.stat-label{font-size:11px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+.stat-value{font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;color:var(--txt);line-height:1;margin-bottom:8px;}
+.stat-change{font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;}
+.stat-change.up{color:var(--green);}
+.stat-change.down{color:var(--red);}
+.stat-icon{position:absolute;top:18px;right:18px;width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+
+/* ══ CARDS ═════════════════════════════════════════ */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.card-title{font-family:'Outfit',sans-serif;font-size:15px;font-weight:700;color:var(--txt);}
+.card-action{font-size:12px;color:var(--orange);cursor:pointer;font-weight:600;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+
+/* ══ TABLE ══════════════════════════════════════════ */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+thead th{text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;padding:10px 14px;border-bottom:1px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .15s;cursor:pointer;}
+tbody tr:hover{background:var(--bg3);}
+tbody td{padding:12px 14px;font-size:13px;color:var(--txt2);}
+tbody td:first-child{color:var(--txt);font-weight:500;}
+tbody tr:last-child{border-bottom:none;}
+
+/* ══ BADGES / PILLS ═════════════════════════════════ */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+.badge-green{background:var(--green-d);color:var(--green);}
+.badge-red{background:var(--red-d);color:var(--red);}
+.badge-orange{background:var(--orange-d);color:var(--orange);}
+.badge-yellow{background:var(--yellow-d);color:var(--yellow);}
+.badge-blue{background:var(--blue-d);color:var(--blue-l);}
+.badge-purple{background:var(--purple-d);color:var(--purple);}
+.badge-pink{background:var(--pink-d);color:var(--pink);}
+
+/* ══ PROGRESS BAR ═══════════════════════════════════ */
+.progress{height:6px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:99px;transition:width .8s ease;}
+
+/* ══ CHART WRAPPERS ═════════════════════════════════ */
+.chart-box{position:relative;}
+.chart-h200{height:200px;}
+.chart-h240{height:240px;}
+.chart-h160{height:160px;}
+
+/* ══ FRAUD / RISK ROWS ══════════════════════════════ */
+.risk-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+.risk-row:last-child{border-bottom:none;}
+.risk-score-bar{flex:1;height:5px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.risk-bar-fill{height:100%;border-radius:99px;}
+
+/* ══ CHALLENGE CARD ═════════════════════════════════ */
+.chal-item{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border);}
+.chal-item:last-child{border-bottom:none;}
+.chal-emoji{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+
+/* ══ INPUTS / BUTTONS ═══════════════════════════════ */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .18s;}
+.btn-primary{background:#028090;color:#fff;}
+.btn-primary:hover{background:#00A896;}
+.btn-ghost{background:var(--bg3);color:var(--txt2);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--bg4);color:var(--txt);}
+.btn-danger{background:var(--red-d);color:var(--red);border:1px solid rgba(239,68,68,.25);}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px;}
+.input{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:9px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--txt);outline:none;transition:border-color .2s;width:100%;}
+.input:focus{border-color:var(--orange-b);}
+select.input option{background:var(--bg3);}
+
+/* ══ TOGGLE ═════════════════════════════════════════ */
+.toggle{display:flex;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:3px;}
+.toggle-opt{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;color:var(--txt2);cursor:pointer;transition:all .18s;}
+.toggle-opt.active{background:var(--orange);color:#fff;}
+
+/* ══ USER AVATAR ════════════════════════════════════ */
+.u-avatar{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;}
+
+/* ══ DONATION TRACK ═════════════════════════════════ */
+.don-item{background:var(--bg3);border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid var(--border);}
+
+/* ══ ANIMATIONS ═════════════════════════════════════ */
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+.panel.active .stat-card{animation:fadeUp .4s ease both;}
+.panel.active .stat-card:nth-child(2){animation-delay:.05s;}
+.panel.active .stat-card:nth-child(3){animation-delay:.1s;}
+.panel.active .stat-card:nth-child(4){animation-delay:.15s;}
+.panel.active .card{animation:fadeUp .4s .1s ease both;}
+
+/* ══ SCROLLBAR ══════════════════════════════════════ */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+
+/* ══ RESPONSIVE ═════════════════════════════════════ */
+@media(max-width:1200px){.stat-grid{grid-template-columns:repeat(2,1fr);}}.
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);}
+  .main{margin-left:0;}
+  .grid-2,.grid-3{grid-template-columns:1fr;}
+}
+
+/* ══ INTEGRATION NOTICE ═════════════════════════════ */
+.integration-box{background:linear-gradient(135deg,rgba(255,107,0,0.1),rgba(236,72,153,0.08));border:1px solid rgba(255,107,0,0.25);border-radius:14px;padding:18px 20px;margin-bottom:20px;display:flex;align-items:center;gap:14px;}
+.int-icon{width:40px;height:40px;border-radius:10px;background:var(--orange-d);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+
+/* ══ LOGIN SCREEN ═══════════════════════════════════ */
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;}
+.login-card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:40px;width:380px;text-align:center;}
+.login-logo{width:56px;height:56px;background:linear-gradient(135deg,#028090,#00A896);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;}
+.login-title{font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px;}
+.login-sub{font-size:13px;color:var(--txt2);margin-bottom:28px;}
+.login-form{text-align:left;display:flex;flex-direction:column;gap:12px;}
+.login-label{font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:5px;display:block;}
+.login-hint{font-size:11px;color:var(--txt3);text-align:center;margin-top:14px;}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🚶</div>
+    <h1 class="login-title">FitKart Admin</h1>
+    <p class="login-sub">Command Centre · fitkart.club</p>
+    <div class="login-form">
+      <div><label class="login-label">Email</label><input class="input" type="email" placeholder="admin@fitkart.club" id="login-email" value="admin@fitkart.club"/></div>
+      <div><label class="login-label">Password</label><input class="input" type="password" placeholder="••••••••" id="login-pass" value="password"/></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="doLogin()">Sign In →</button>
+    </div>
+    <p class="login-hint">Sign in with your admin account</p>
+  </div>
+</div>
+
+<!-- ══════════════ APP SHELL ══════════════ -->
+<div style="background:linear-gradient(135deg,#028090,#00A896);padding:10px 24px;display:flex;align-items:center;justify-content:space-between;">
+  <a href="https://fitkart.club" style="color:white;font-family:Outfit,sans-serif;font-weight:800;font-size:16px;text-decoration:none;">🚶 FitKart Club</a>
+  <div style="display:flex;gap:20px;align-items:center;">
+    <a href="https://fitkart.club" style="color:rgba(255,255,255,0.85);font-size:13px;text-decoration:none;font-family:Outfit,sans-serif;">← Back to Website</a>
+    <span style="color:rgba(255,255,255,0.6);font-size:12px;font-family:Outfit,sans-serif;">Admin Console</span>
+  </div>
+</div>
+<div class="layout" id="app-shell" style="display:none;">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-icon">🚶</div>
+      <div><div class="sb-logo-text">FitKart</div><div class="sb-logo-sub">Admin Console</div></div>
+    </div>
+
+    <div class="sb-section">Overview</div>
+    <div class="sb-item active" onclick="nav('dashboard',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>Dashboard
+    </div>
+    <div class="sb-item" onclick="nav('analytics',this)">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Analytics
+    </div>
+
+    <div class="sb-section">Users</div>
+    <div class="sb-item" onclick="nav('users',this)">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>All Users
+      <span class="sb-badge orange">2.4M</span>
+    </div>
+    <div class="sb-item" onclick="nav('fraud',this)">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Anti-Cheat
+      <span class="sb-badge">14</span>
+    </div>
+
+    <div class="sb-section">Economy</div>
+    <div class="sb-item" onclick="nav('coins',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>FitKart Coins (FKC)
+    </div>
+    <div class="sb-item" onclick="nav('perks',this)">
+      <svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>Perks & Vouchers
+    </div>
+    <div class="sb-item" onclick="nav('donations',this)">
+      <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>Donations
+    </div>
+
+    <div class="sb-section">Engagement</div>
+    <div class="sb-item" onclick="nav('challenges',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>Challenges
+    </div>
+    <div class="sb-item" onclick="nav('social',this)">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Social & Leaderboard
+    </div>
+
+    <div class="sb-section">Platform</div>
+    <div class="sb-item" onclick="nav('brands',this)">
+      <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Brand Partners
+    </div>
+    <div class="sb-item" onclick="nav('notifications',this)">
+      <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>Notifications
+    </div>
+    <div class="sb-item" onclick="nav('settings',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings
+    </div>
+
+    <div class="sb-footer">
+      <div class="sb-user">
+        <div class="sb-avatar">FK</div>
+        <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">FitKart Admin</div><div style="font-size:11px;color:var(--txt3);">Super Admin</div></div>
+        <svg style="width:15px;height:15px;stroke:var(--txt3);fill:none;stroke-width:1.8;" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="tb-search">
+        <svg class="tb-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input placeholder="Search users, transactions, challenges…"/>
+      </div>
+      <div class="tb-right">
+        <div class="tb-live"><div class="tb-live-dot"></div>Live · 2,847 active</div>
+        <div class="tb-btn" title="Notifications"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg><div class="notif-dot"></div></div>
+        <div class="tb-btn" title="Help"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg></div>
+        <div class="tb-avatar" title="Profile">FK</div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- ══════════ DASHBOARD ══════════ -->
+      <div class="panel active" id="panel-dashboard">
+        <h1 class="panel-title">Command Centre</h1>
+        <p class="panel-sub">Wednesday, 18 March 2026 · Real-time overview of FitKart platform</p>
+
+        <div class="integration-box">
+          <div class="int-icon">🔗</div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:700;margin-bottom:3px;">Integration: <span style="color:var(--orange);">fitkart.club/admin/</span></div>
+            <div style="font-size:12px;color:var(--txt2);">Host this file at <code style="background:var(--bg4);padding:1px 6px;border-radius:4px;font-size:11px;">fitkart.club/admin/index.html</code> via WordPress → Appearance → Theme File Editor, or upload via FTP/cPanel. Set FastAPI base URL in Settings.</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="nav('settings',document.querySelector('.sb-item:last-of-type'))">Configure API</button>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Users</div>
+            <div class="stat-value" id="c-users">2.41M</div>
+            <div class="stat-change up">↑ 12.4% this month</div>
+            <div class="stat-icon" style="background:var(--blue-d);">👟</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">FitKart Coins (FKC) Issued</div>
+            <div class="stat-value" data-stat="coins">84.2B</div>
+            <div class="stat-change up">↑ 8.1% this week</div>
+            <div class="stat-icon" style="background:var(--yellow-d);">🪙</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Today</div>
+            <div class="stat-value" id="c-active">187K</div>
+            <div class="stat-change up">↑ 3.2% vs yesterday</div>
+            <div class="stat-icon" style="background:var(--green-d);">⚡</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Fraud Flags</div>
+            <div class="stat-value" style="color:var(--red);" data-stat="fraud">14</div>
+            <div class="stat-change down">↑ 2 new today</div>
+            <div class="stat-icon" style="background:var(--red-d);">🛡️</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- Daily Steps Chart -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">Platform Steps — Last 30 Days</span>
+              <div class="toggle"><div class="toggle-opt active">30d</div><div class="toggle-opt">7d</div><div class="toggle-opt">90d</div></div>
+            </div>
+            <div class="chart-box chart-h200"><canvas id="stepsChart"></canvas></div>
+          </div>
+          <!-- Coins Economy -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">Coin Economy</span><span class="card-action">Export CSV</span></div>
+            <div class="chart-box chart-h200"><canvas id="coinsChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <!-- Recent fraud alerts -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">🛡️ Fraud Alerts</span><span class="card-action" onclick="nav('fraud',null)">View All</span></div>
+            <div class="risk-row"><div class="u-avatar" style="background:#EF4444;color:#fff;">BT</div><div style="flex:1;"><div style="font-size:12px;font-weight:600;">bot_user_9981</div><div style="font-size:11px;color:var(--txt3);">Step stuffing · 2m ago</div></div><span class="badge badge-red">SUSPEND</span></div>
+            <div class="risk-row"><div class="u-avatar" style="background:#F59E0B;color:#fff;">GS</div><div style="flex:1;"><div style="font-size:12px;font-weight:600;">gps_spoof_441</div><div style="font-size:11px;color:var(--txt3);">GPS spoofing · 8m ago</div></div><span class="badge badge-yellow">REVIEW</span></div>
+            <div class="risk-row"><div class="u-avatar" style="background:#8B5CF6;color:#fff;">DF</div><div style="flex:1;"><div style="font-size:12px;font-weight:600;">device_farm_77</div><div style="font-size:11px;color:var(--txt3);">Device farm · 14m ago</div></div><span class="badge badge-red">BLOCK</span></div>
+            <div class="risk-row"><div class="u-avatar" style="background:#EC4899;color:#fff;">CL</div><div style="flex:1;"><div style="font-size:12px;font-weight:600;">coin_launder_3</div><div style="font-size:11px;color:var(--txt3);">Coin laundering · 31m ago</div></div><span class="badge badge-orange">REVIEW</span></div>
+          </div>
+          <!-- Top perks redeemed -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">🎁 Top Redemptions</span><span class="card-action">Today</span></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:var(--blue-d);">🛍️</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Myntra</div><div class="progress" style="margin-top:5px;"><div class="progress-fill" style="width:82%;background:var(--blue-l);"></div></div></div><span style="font-size:12px;font-weight:700;color:var(--txt);">8,241</span></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:#FFF1F0;">☕</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Starbucks</div><div class="progress" style="margin-top:5px;"><div class="progress-fill" style="width:61%;background:var(--orange);"></div></div></div><span style="font-size:12px;font-weight:700;color:var(--txt);">6,142</span></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:#ECFDF5;">🍔</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Zomato</div><div class="progress" style="margin-top:5px;"><div class="progress-fill" style="width:47%;background:var(--green);"></div></div></div><span style="font-size:12px;font-weight:700;color:var(--txt);">4,720</span></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:var(--purple-d);">🎬</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">PVR Cinemas</div><div class="progress" style="margin-top:5px;"><div class="progress-fill" style="width:33%;background:var(--purple);"></div></div></div><span style="font-size:12px;font-weight:700;color:var(--txt);">3,311</span></div>
+          </div>
+          <!-- Donations -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">❤️ Donations Today</span><span class="card-action" onclick="nav('donations',null)">Manage</span></div>
+            <div style="text-align:center;padding:8px 0 14px;"><div style="font-family:'Outfit',sans-serif;font-size:32px;font-weight:800;color:var(--green);">₹24,810</div><div style="font-size:12px;color:var(--txt2);margin-top:3px;">from 1,841 donors today</div></div>
+            <div class="don-item"><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font-size:12px;font-weight:600;">🐾 Stray Animals</span><span style="font-size:12px;font-weight:700;color:var(--green);">₹11,240</span></div><div class="progress"><div class="progress-fill" style="width:68%;background:var(--green);"></div></div></div>
+            <div class="don-item"><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font-size:12px;font-weight:600;">💧 Clean Water</span><span style="font-size:12px;font-weight:700;color:var(--blue-l);">₹8,120</span></div><div class="progress"><div class="progress-fill" style="width:49%;background:var(--blue-l);"></div></div></div>
+            <div class="don-item"><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font-size:12px;font-weight:600;">🌱 Plant a Forest</span><span style="font-size:12px;font-weight:700;color:var(--orange);">₹5,450</span></div><div class="progress"><div class="progress-fill" style="width:33%;background:var(--orange);"></div></div></div>
+          </div>
+        </div>
+
+        <!-- Recent users table -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Recent Signups</span><button class="btn btn-ghost btn-sm">Export</button></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>User</th><th>City</th><th>Joined</th><th>Steps (Today)</th><th>Coins</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="user-table">
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--blue);color:#fff;">RS</div>Rahul Sharma</div></td><td>Mumbai</td><td>2h ago</td><td>8,432</td><td>842</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">View</button></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--pink);color:#fff;">PK</div>Priya Kumar</div></td><td>Bengaluru</td><td>4h ago</td><td>12,100</td><td>1,210</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">View</button></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--purple);color:#fff;">AM</div>Arjun Mehta</div></td><td>Delhi</td><td>6h ago</td><td>6,800</td><td>680</td><td><span class="badge badge-yellow">Review</span></td><td><button class="btn btn-danger btn-sm">Flag</button></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--green);color:#fff;">SK</div>Sunita Kapoor</div></td><td>Pune</td><td>9h ago</td><td>9,200</td><td>920</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">View</button></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--orange);color:#fff;">VN</div>Vikram Nair</div></td><td>Chennai</td><td>11h ago</td><td>0</td><td>4,820</td><td><span class="badge badge-red">Suspended</span></td><td><button class="btn btn-danger btn-sm">Audit</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ ANALYTICS ══════════ -->
+      <div class="panel" id="panel-analytics">
+        <h1 class="panel-title">Analytics</h1>
+        <p class="panel-sub">Platform performance · step trends · user retention · coin economy</p>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">Avg Steps / User / Day</div><div class="stat-value">7,842</div><div class="stat-change up">↑ 4.2%</div><div class="stat-icon" style="background:var(--blue-d);">📈</div></div>
+          <div class="stat-card"><div class="stat-label">DAU / MAU Ratio</div><div class="stat-value">38.4%</div><div class="stat-change up">↑ 1.8%</div><div class="stat-icon" style="background:var(--green-d);">📊</div></div>
+          <div class="stat-card"><div class="stat-label">Coins Redeemed Today</div><div class="stat-value">14.2M</div><div class="stat-change down">↓ 2.1%</div><div class="stat-icon" style="background:var(--yellow-d);">🪙</div></div>
+          <div class="stat-card"><div class="stat-label">Revenue (INR)</div><div class="stat-value">₹8.4L</div><div class="stat-change up">↑ 18.3%</div><div class="stat-icon" style="background:var(--orange-d);">💰</div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="card-header"><span class="card-title">User Growth — 12 Months</span></div><div class="chart-box chart-h240"><canvas id="growthChart"></canvas></div></div>
+          <div class="card"><div class="card-header"><span class="card-title">Steps by City</span></div><div class="chart-box chart-h240"><canvas id="cityChart"></canvas></div></div>
+        </div>
+        <div class="card"><div class="card-header"><span class="card-title">Daily Active Users — Last 30 Days</span><button class="btn btn-ghost btn-sm">Export CSV</button></div><div class="chart-box chart-h200"><canvas id="dauChart"></canvas></div></div>
+      </div>
+
+      <!-- ══════════ USERS ══════════ -->
+      <div class="panel" id="panel-users">
+        <h1 class="panel-title">All Users</h1>
+        <p class="panel-sub">2,410,842 registered · search, filter, manage</p>
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+          <input class="input" style="max-width:260px;" placeholder="Search by name / email / ID…"/>
+          <select class="input" style="max-width:160px;"><option>All Status</option><option>Active</option><option>Suspended</option><option>Review</option></select>
+          <select class="input" style="max-width:160px;"><option>All Cities</option><option>Mumbai</option><option>Delhi</option><option>Bengaluru</option><option>Pune</option><option>Chennai</option></select>
+          <button class="btn btn-primary"><svg style="width:14px;height:14px;fill:none;stroke:#fff;stroke-width:2;" viewBox="0 0 24 24"><polyline points="21 15 21 21 15 21"/><path d="M21 21L15 15M3 10a7 7 0 1014 0 7 7 0 00-14 0"/></svg>Filter</button>
+          <button class="btn btn-ghost" style="margin-left:auto;">Export CSV</button>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>User</th><th>Phone</th><th>City</th><th>Level</th><th>Total Steps</th><th>Coins Balance</th><th>Streak</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--blue);color:#fff;">RS</div><div><div>Rahul Sharma</div><div style="font-size:11px;color:var(--txt3);"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fa889b928f96ba9d979b9396d4999597">[email&#160;protected]</a></div></div></div></td><td>+91 98200 00001</td><td>Mumbai</td><td><span class="badge badge-orange">Pro Walker</span></td><td>1.2M</td><td>12,450</td><td>🔥 34d</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">Manage</button></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--pink);color:#fff;">PK</div><div><div>Priya Kumar</div><div style="font-size:11px;color:var(--txt3);"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="83f3f1eafae2c3e4eee2eaefade0ecee">[email&#160;protected]</a></div></div></div></td><td>+91 98200 00002</td><td>Bengaluru</td><td><span class="badge badge-purple">Elite</span></td><td>840K</td><td>8,200</td><td>🔥 21d</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">Manage</button></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--red);color:#fff;">VN</div><div><div>Vikram Nair</div><div style="font-size:11px;color:var(--txt3);"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0a7c6361786b674a6d676b636624696567">[email&#160;protected]</a></div></div></div></td><td>+91 98200 00003</td><td>Chennai</td><td><span class="badge badge-blue">Walker</span></td><td>24K</td><td>4,820</td><td>—</td><td><span class="badge badge-red">Suspended</span></td><td><button class="btn btn-danger btn-sm">Audit</button></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--green);color:#fff;">SK</div><div><div>Sunita Kapoor</div><div style="font-size:11px;color:var(--txt3);"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="196a6c77706d78597e74787075377a7674">[email&#160;protected]</a></div></div></div></td><td>+91 98200 00004</td><td>Pune</td><td><span class="badge badge-orange">Pro Walker</span></td><td>680K</td><td>6,800</td><td>🔥 8d</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">Manage</button></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:10px;"><div class="u-avatar" style="background:var(--yellow);color:#000;">AM</div><div><div>Arjun Mehta</div><div style="font-size:11px;color:var(--txt3);"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="69081b031c07290e04080005470a0604">[email&#160;protected]</a></div></div></div></td><td>+91 98200 00005</td><td>Delhi</td><td><span class="badge badge-blue">Walker</span></td><td>120K</td><td>1,200</td><td>🔥 3d</td><td><span class="badge badge-yellow">Review</span></td><td><button class="btn btn-danger btn-sm">Flag</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ ANTI-CHEAT ══════════ -->
+      <div class="panel" id="panel-fraud">
+        <h1 class="panel-title">Anti-Cheat Engine</h1>
+        <p class="panel-sub">Real-time fraud detection · 5-layer validation · FKC integrity</p>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">Txns Validated Today</div><div class="stat-value">847K</div><div class="stat-change up">↑ All clean</div><div class="stat-icon" style="background:var(--green-d);">✅</div></div>
+          <div class="stat-card"><div class="stat-label">Flagged (Review)</div><div class="stat-value" style="color:var(--yellow);">38</div><div class="stat-change down">Awaiting review</div><div class="stat-icon" style="background:var(--yellow-d);">🔍</div></div>
+          <div class="stat-card"><div class="stat-label">Blocked Today</div><div class="stat-value" style="color:var(--orange);">12</div><div class="stat-change down">Transactions denied</div><div class="stat-icon" style="background:var(--orange-d);">🚫</div></div>
+          <div class="stat-card"><div class="stat-label">Suspended Accounts</div><div class="stat-value" style="color:var(--red);">14</div><div class="stat-change down">↑ 2 new today</div><div class="stat-icon" style="background:var(--red-d);">🔴</div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Cheat Type Breakdown</span></div>
+            <div class="chart-box chart-h200"><canvas id="fraudChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Risk Score Distribution</span></div>
+            <div class="chart-box chart-h200"><canvas id="riskChart"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Recent Fraud Detections</span><button class="btn btn-ghost btn-sm">Export</button></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>User</th><th>Cheat Type</th><th>Risk Score</th><th>Coins at Risk</th><th>Device</th><th>Time</th><th>Decision</th><th>Action</th></tr></thead>
+              <tbody>
+                <tr><td>bot_user_9981</td><td>Step Stuffing + Bot Pattern</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:60px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;"><div style="width:97%;height:100%;background:var(--red);border-radius:3px;"></div></div>97</div></td><td>8,500</td><td>Emulator</td><td>2m ago</td><td><span class="badge badge-red">SUSPEND</span></td><td><button class="btn btn-danger btn-sm">Review</button></td></tr>
+                <tr><td>gps_spoof_441</td><td>GPS Spoofing</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:60px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;"><div style="width:71%;height:100%;background:var(--orange);border-radius:3px;"></div></div>71</div></td><td>2,100</td><td>Xiaomi 13</td><td>8m ago</td><td><span class="badge badge-orange">BLOCK</span></td><td><button class="btn btn-ghost btn-sm">Appeal</button></td></tr>
+                <tr><td>device_farm_77</td><td>Device Farm (8 accts)</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:60px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;"><div style="width:89%;height:100%;background:var(--red);border-radius:3px;"></div></div>89</div></td><td>42,000</td><td>Emulator</td><td>14m ago</td><td><span class="badge badge-red">BLOCK</span></td><td><button class="btn btn-danger btn-sm">Ban Ring</button></td></tr>
+                <tr><td>coin_launder_3</td><td>Coin Laundering</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:60px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;"><div style="width:45%;height:100%;background:var(--yellow);border-radius:3px;"></div></div>45</div></td><td>500</td><td>OnePlus 12</td><td>31m ago</td><td><span class="badge badge-yellow">REVIEW</span></td><td><button class="btn btn-ghost btn-sm">Approve</button></td></tr>
+                <tr><td>sleep_steps_22</td><td>Sleep Steps (2AM)</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:60px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;"><div style="width:35%;height:100%;background:var(--yellow);border-radius:3px;"></div></div>35</div></td><td>300</td><td>Samsung S24</td><td>1h ago</td><td><span class="badge badge-yellow">REVIEW</span></td><td><button class="btn btn-ghost btn-sm">Approve</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ COINS ══════════ -->
+      <div class="panel" id="panel-coins">
+        <h1 class="panel-title">FitKart Coin Economy</h1>
+        <p class="panel-sub">Issuance · redemptions · INR conversion rates · wallet management</p>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">Total in Circulation</div><div class="stat-value">84.2B</div><div class="stat-change up">↑ 8.1%</div><div class="stat-icon" style="background:var(--yellow-d);">🪙</div></div>
+          <div class="stat-card"><div class="stat-label">Issued Today</div><div class="stat-value">142M</div><div class="stat-change up">↑ 4.3%</div><div class="stat-icon" style="background:var(--green-d);">⬆️</div></div>
+          <div class="stat-card"><div class="stat-label">Redeemed Today</div><div class="stat-value">38M</div><div class="stat-change up">↑ 12.8%</div><div class="stat-icon" style="background:var(--blue-d);">💳</div></div>
+          <div class="stat-card"><div class="stat-label">Current Rate</div><div class="stat-value">₹0.33</div><div class="stat-change">per coin</div><div class="stat-icon" style="background:var(--orange-d);">💱</div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="card-header"><span class="card-title">Issuance vs Redemption</span></div><div class="chart-box chart-h240"><canvas id="ecoChart"></canvas></div></div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Coin Rate Settings</span></div>
+            <div style="display:flex;flex-direction:column;gap:14px;padding-top:4px;">
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Coins per 100 steps</label><div style="display:flex;gap:8px;"><input class="input" value="1.00" style="max-width:120px;"/><button class="btn btn-primary btn-sm">Update</button></div></div>
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">INR per coin (₹)</label><div style="display:flex;gap:8px;"><input class="input" value="0.33" style="max-width:120px;"/><button class="btn btn-primary btn-sm">Update</button></div></div>
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">2× Boost multiplier</label><div style="display:flex;gap:8px;"><input class="input" value="2.00" style="max-width:120px;"/><button class="btn btn-primary btn-sm">Update</button></div></div>
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Max coins / day / user</label><div style="display:flex;gap:8px;"><input class="input" value="10000" style="max-width:120px;"/><button class="btn btn-primary btn-sm">Update</button></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ PERKS ══════════ -->
+      <div class="panel" id="panel-perks">
+        <h1 class="panel-title">Perks & Vouchers</h1>
+        <p class="panel-sub">Manage brand vouchers · coin prices · redemption rules</p>
+        <div style="display:flex;gap:10px;margin-bottom:16px;"><button class="btn btn-primary">+ Add Voucher</button><button class="btn btn-ghost">Import CSV</button></div>
+        <div class="card" style="padding:0;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Brand</th><th>Category</th><th>Discount</th><th>Coin Price</th><th>Redeemed Today</th><th>Stock</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>🛍️ Myntra</td><td>Fashion</td><td>₹500 OFF</td><td>450 coins</td><td>8,241</td><td>Unlimited</td><td><span class="badge badge-green">Live</span></td><td><button class="btn btn-ghost btn-sm">Edit</button></td></tr>
+                <tr><td>☕ Starbucks</td><td>Food & Bev</td><td>Free Drink</td><td>150 coins</td><td>6,142</td><td>Unlimited</td><td><span class="badge badge-green">Live</span></td><td><button class="btn btn-ghost btn-sm">Edit</button></td></tr>
+                <tr><td>🍔 Zomato</td><td>Food</td><td>₹200 OFF</td><td>180 coins</td><td>4,720</td><td>Unlimited</td><td><span class="badge badge-green">Live</span></td><td><button class="btn btn-ghost btn-sm">Edit</button></td></tr>
+                <tr><td>🎬 PVR Cinemas</td><td>Entertainment</td><td>Buy 1 Get 1</td><td>300 coins</td><td>3,311</td><td>5,000</td><td><span class="badge badge-yellow">Limited</span></td><td><button class="btn btn-ghost btn-sm">Edit</button></td></tr>
+                <tr><td>💄 Nykaa</td><td>Beauty</td><td>25% OFF</td><td>220 coins</td><td>2,100</td><td>Unlimited</td><td><span class="badge badge-green">Live</span></td><td><button class="btn btn-ghost btn-sm">Edit</button></td></tr>
+                <tr><td>👟 Nike Store</td><td>Fashion</td><td>20% OFF</td><td>500 coins</td><td>1,840</td><td>Unlimited</td><td><span class="badge badge-red">Paused</span></td><td><button class="btn btn-primary btn-sm">Activate</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ DONATIONS ══════════ -->
+      <div class="panel" id="panel-donations">
+        <h1 class="panel-title">Donations</h1>
+        <p class="panel-sub">Walk for a Cause · stray animals · NGO partners · coin-to-INR conversion</p>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">Total Raised (All Time)</div><div class="stat-value" style="color:var(--green);">₹38.2L</div><div class="stat-change up">↑ 14.2% MoM</div><div class="stat-icon" style="background:var(--green-d);">❤️</div></div>
+          <div class="stat-card"><div class="stat-label">Donors Today</div><div class="stat-value">1,841</div><div class="stat-change up">↑ 8.3%</div><div class="stat-icon" style="background:var(--pink-d);">🐾</div></div>
+          <div class="stat-card"><div class="stat-label">Coins Donated Today</div><div class="stat-value">74.2M</div><div class="stat-change up">↑ 5.1%</div><div class="stat-icon" style="background:var(--yellow-d);">🪙</div></div>
+          <div class="stat-card"><div class="stat-label">INR Transferred</div><div class="stat-value">₹24,810</div><div class="stat-change up">Today</div><div class="stat-icon" style="background:var(--orange-d);">💸</div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="card-header"><span class="card-title">Donations by Cause</span></div><div class="chart-box chart-h200"><canvas id="donChart"></canvas></div></div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">NGO Partners</span><button class="btn btn-primary btn-sm">+ Add NGO</button></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:#FFF0F0;">🐾</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Stray Animals Fund</div><div style="font-size:11px;color:var(--txt3);">fitkart.club/donate-stray-animals</div><div class="progress" style="margin-top:6px;"><div class="progress-fill" style="width:68%;background:var(--green);"></div></div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:700;color:var(--green);">₹11,240</div><div style="font-size:11px;color:var(--txt3);">today</div></div></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:#EFF6FF;">💧</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Clean Water Initiative</div><div style="font-size:11px;color:var(--txt3);">Animal Aid Unlimited</div><div class="progress" style="margin-top:6px;"><div class="progress-fill" style="width:49%;background:var(--blue-l);"></div></div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:700;color:var(--blue-l);">₹8,120</div><div style="font-size:11px;color:var(--txt3);">today</div></div></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:#ECFDF5;">🌱</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Plant a Forest</div><div style="font-size:11px;color:var(--txt3);">Green Yatra Foundation</div><div class="progress" style="margin-top:6px;"><div class="progress-fill" style="width:33%;background:var(--orange);"></div></div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:700;color:var(--orange);">₹5,450</div><div style="font-size:11px;color:var(--txt3);">today</div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Recent Donations</span><button class="btn btn-ghost btn-sm">Export</button></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Donor</th><th>Cause</th><th>Coins</th><th>INR Value</th><th>Time</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Rahul Sharma</td><td>🐾 Stray Animals</td><td>500</td><td>₹165</td><td>2m ago</td><td><span class="badge badge-green">Transferred</span></td></tr>
+                <tr><td>Priya Kumar</td><td>💧 Clean Water</td><td>200</td><td>₹66</td><td>8m ago</td><td><span class="badge badge-green">Transferred</span></td></tr>
+                <tr><td>Arjun Singh</td><td>🌱 Plant a Forest</td><td>1000</td><td>₹330</td><td>15m ago</td><td><span class="badge badge-yellow">Pending</span></td></tr>
+                <tr><td>Meena Iyer</td><td>🐾 Stray Animals</td><td>300</td><td>₹99</td><td>22m ago</td><td><span class="badge badge-green">Transferred</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ CHALLENGES ══════════ -->
+      <div class="panel" id="panel-challenges">
+        <h1 class="panel-title">Challenges</h1>
+        <p class="panel-sub">Create · manage · track live challenges across the FitKart community</p>
+        <div style="display:flex;gap:10px;margin-bottom:16px;"><button class="btn btn-primary">+ Create Challenge</button><button class="btn btn-ghost">Scheduled</button></div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">Active Challenges</div><div class="stat-value">8</div><div class="stat-change up">2 ending today</div><div class="stat-icon" style="background:var(--orange-d);">🏆</div></div>
+          <div class="stat-card"><div class="stat-label">Total Participants</div><div class="stat-value">284K</div><div class="stat-change up">↑ 18%</div><div class="stat-icon" style="background:var(--blue-d);">👥</div></div>
+          <div class="stat-card"><div class="stat-label">Walk to Moon (Global)</div><div class="stat-value">384K km</div><div class="stat-change up">↑ 2,400 km today</div><div class="stat-icon" style="background:var(--purple-d);">🌕</div></div>
+          <div class="stat-card"><div class="stat-label">Coins Awarded</div><div class="stat-value">42M</div><div class="stat-change up">This week</div><div class="stat-icon" style="background:var(--yellow-d);">🎁</div></div>
+        </div>
+        <div class="card" style="padding:0;">
+          <div style="padding:18px 20px;border-bottom:1px solid var(--border);"><span class="card-title">Active Challenges</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Challenge</th><th>Type</th><th>Participants</th><th>Progress</th><th>Ends</th><th>Reward</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>🏃 Weekend Warrior</td><td>Steps</td><td>1,241</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:80px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;"><div style="width:72%;height:100%;background:var(--blue-l);border-radius:3px;"></div></div>72%</div></td><td>2d left</td><td>500 coins</td><td><span class="badge badge-green">Live</span></td><td><button class="btn btn-ghost btn-sm">Manage</button></td></tr>
+                <tr><td>🌅 Morning Streak</td><td>Streak</td><td>840</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:80px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;"><div style="width:55%;height:100%;background:var(--orange);border-radius:3px;"></div></div>55%</div></td><td>5d left</td><td>300 coins</td><td><span class="badge badge-green">Live</span></td><td><button class="btn btn-ghost btn-sm">Manage</button></td></tr>
+                <tr><td>🌍 Walk to the Moon</td><td>Distance</td><td>50,000</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:80px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;"><div style="width:98%;height:100%;background:var(--purple);border-radius:3px;"></div></div>98%</div></td><td>Ongoing</td><td>1000 coins</td><td><span class="badge badge-purple">Global</span></td><td><button class="btn btn-ghost btn-sm">Manage</button></td></tr>
+                <tr><td>🏋️ Calorie Crusher</td><td>Calories</td><td>3,200</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:80px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;"><div style="width:41%;height:100%;background:var(--pink);border-radius:3px;"></div></div>41%</div></td><td>3d left</td><td>200 coins</td><td><span class="badge badge-green">Live</span></td><td><button class="btn btn-ghost btn-sm">Manage</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ SOCIAL ══════════ -->
+      <div class="panel" id="panel-social">
+        <h1 class="panel-title">Social & Leaderboard</h1>
+        <p class="panel-sub">Community feed · leaderboard management · friend activity</p>
+        <div class="grid-2">
+          <div class="card"><div class="card-header"><span class="card-title">Global Leaderboard — Top 10</span><div class="toggle"><div class="toggle-opt active">Weekly</div><div class="toggle-opt">Monthly</div></div></div>
+            <div class="table-wrap"><table><thead><tr><th>#</th><th>User</th><th>City</th><th>Steps</th><th>INR Earned</th></tr></thead><tbody>
+              <tr><td style="color:var(--yellow);font-weight:800;">🥇1</td><td><div style="display:flex;align-items:center;gap:8px;"><div class="u-avatar" style="background:var(--blue);color:#fff;">AM</div>Alex M.</div></td><td>Mumbai</td><td>48,500</td><td style="color:var(--green);">₹48.5</td></tr>
+              <tr><td>2</td><td><div style="display:flex;align-items:center;gap:8px;"><div class="u-avatar" style="background:var(--pink);color:#fff;">S</div>Sarah</div></td><td>Delhi</td><td>42,000</td><td style="color:var(--green);">₹42.0</td></tr>
+              <tr><td>3</td><td><div style="display:flex;align-items:center;gap:8px;"><div class="u-avatar" style="background:var(--orange);color:#fff;">R</div>Rahul</div></td><td>Bengaluru</td><td>39,000</td><td style="color:var(--green);">₹39.0</td></tr>
+              <tr><td>4</td><td><div style="display:flex;align-items:center;gap:8px;"><div class="u-avatar" style="background:var(--purple);color:#fff;">PS</div>Priya S.</div></td><td>Pune</td><td>35,402</td><td style="color:var(--green);">₹35.4</td></tr>
+              <tr><td>5</td><td><div style="display:flex;align-items:center;gap:8px;"><div class="u-avatar" style="background:var(--green);color:#fff;">DC</div>David C.</div></td><td>Chennai</td><td>28,900</td><td style="color:var(--green);">₹28.9</td></tr>
+            </tbody></table></div>
+          </div>
+          <div class="card"><div class="card-header"><span class="card-title">Activity Feed</span><span class="card-action">Moderate</span></div>
+            <div class="risk-row"><div class="u-avatar" style="background:#6366F1;color:#fff;">RK</div><div style="flex:1;"><div style="font-size:12px;font-weight:600;">Rahul K. earned 50 coins</div><div style="font-size:11px;color:var(--txt3);">2 mins ago</div></div><span class="badge badge-yellow">🪙 ₹50</span></div>
+            <div class="risk-row"><div class="u-avatar" style="background:var(--green);color:#fff;">SJ</div><div style="flex:1;"><div style="font-size:12px;font-weight:600;">Sarah J. completed 10k steps</div><div style="font-size:11px;color:var(--txt3);">15 mins ago</div></div><span class="badge badge-blue">🚶 10.2k</span></div>
+            <div class="risk-row"><div class="u-avatar" style="background:var(--purple);color:#fff;">AV</div><div style="flex:1;"><div style="font-size:12px;font-weight:600;">Amit V. 30-day streak!</div><div style="font-size:11px;color:var(--txt3);">1 hour ago</div></div><span class="badge badge-orange">🔥 HOT</span></div>
+            <div class="risk-row"><div class="u-avatar" style="background:var(--pink);color:#fff;">MP</div><div style="flex:1;"><div style="font-size:12px;font-weight:600;">Meera donated 500 coins 🐾</div><div style="font-size:11px;color:var(--txt3);">2 hours ago</div></div><span class="badge badge-green">❤️</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ BRANDS ══════════ -->
+      <div class="panel" id="panel-brands">
+        <h1 class="panel-title">Brand Partners</h1>
+        <p class="panel-sub">Manage brand integrations · campaign performance · revenue tracking</p>
+        <div style="display:flex;gap:10px;margin-bottom:16px;"><button class="btn btn-primary">+ Onboard Brand</button></div>
+        <div class="card" style="padding:0;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Brand</th><th>Type</th><th>Redemptions MTD</th><th>Revenue</th><th>Campaign</th><th>Contract</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>🛍️ Myntra</td><td>Reward Partner</td><td>82,410</td><td>₹4.12L</td><td>Fashion Week Sale</td><td>Dec 2026</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">Details</button></td></tr>
+                <tr><td>☕ Starbucks</td><td>Reward Partner</td><td>61,420</td><td>₹1.84L</td><td>Morning Boost</td><td>Jun 2026</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">Details</button></td></tr>
+                <tr><td>🍔 Zomato</td><td>Campaign Partner</td><td>47,200</td><td>₹2.36L</td><td>Weekend Feast</td><td>Sep 2026</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">Details</button></td></tr>
+                <tr><td>👟 Nike Store</td><td>Exclusive Partner</td><td>18,400</td><td>₹9.20L</td><td>Run Season</td><td>Mar 2027</td><td><span class="badge badge-red">Paused</span></td><td><button class="btn btn-primary btn-sm">Resume</button></td></tr>
+                <tr><td>💄 Nykaa</td><td>Reward Partner</td><td>21,000</td><td>₹1.47L</td><td>Glow Up</td><td>Aug 2026</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm">Details</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ NOTIFICATIONS ══════════ -->
+      <div class="panel" id="panel-notifications">
+        <h1 class="panel-title">Notifications</h1>
+        <p class="panel-sub">Push notifications · in-app messages · daily reminders · scheduled blasts</p>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Send Push Notification</span></div>
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Target Audience</label><select class="input"><option>All Users (2.41M)</option><option>Active Today</option><option>Inactive 7+ Days</option><option>Pro Users</option><option>Custom Segment</option></select></div>
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Title</label><input class="input" placeholder="e.g. Double Coins Weekend! 🔥"/></div>
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Message</label><textarea class="input" rows="3" style="resize:none;" placeholder="Walk 5,000 steps today and earn 2× FitKart Coins (FKC). Limited time offer!"></textarea></div>
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Schedule</label><input class="input" type="datetime-local"/></div>
+              <button class="btn btn-primary">Send Notification 📤</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Recent Sent</span></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:var(--orange-d);">🔥</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Double Coins Friday!</div><div style="font-size:11px;color:var(--txt3);">Sent to 2.41M · 1h ago</div><div style="font-size:11px;color:var(--green);margin-top:2px;">Open rate: 42.3%</div></div></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:var(--blue-d);">🏆</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Weekend Warrior starts!</div><div style="font-size:11px;color:var(--txt3);">Sent to 1.2M · 2d ago</div><div style="font-size:11px;color:var(--green);margin-top:2px;">Open rate: 38.7%</div></div></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:var(--green-d);">🐾</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Walk for Stray Animals</div><div style="font-size:11px;color:var(--txt3);">Sent to 2.41M · 5d ago</div><div style="font-size:11px;color:var(--green);margin-top:2px;">Open rate: 51.2%</div></div></div>
+            <div class="chal-item"><div class="chal-emoji" style="background:var(--yellow-d);">🌙</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Daily step reminder</div><div style="font-size:11px;color:var(--txt3);">Auto · 187K inactive users</div><div style="font-size:11px;color:var(--green);margin-top:2px;">Open rate: 29.4%</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ SETTINGS ══════════ -->
+      <div class="panel" id="panel-settings">
+        <h1 class="panel-title">Settings</h1>
+        <p class="panel-sub">API configuration · Supabase · FastAPI · integration with fitkart.club</p>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><span class="card-title">API Configuration</span></div>
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">FastAPI Base URL</label><input class="input" value="https://api.fitkart.club/v1" placeholder="https://api.fitkart.club/v1"/></div>
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Supabase URL</label><input class="input" value="https://qtdlwbtfwteidjldpyvf.supabase.co" placeholder="https://xxx.supabase.co"/></div>
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Supabase Anon Key</label><input class="input" type="password" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0ZGx3YnRmd3RlaWRqbGRweXZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MjA2NzcsImV4cCI6MjA4OTM5NjY3N30.yvUDAfZ_4aMOPvOOoqrbGZGWyd4upLu6P15sdwKxN4M" placeholder="eyJhbGci..."/></div>
+              <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Admin Secret Key</label><input class="input" type="password" value="sk-admin-..." placeholder="sk-admin-..."/></div>
+              <button class="btn btn-primary">Save & Test Connection</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">WordPress Integration</span></div>
+            <div style="background:var(--bg3);border-radius:10px;padding:16px;margin-bottom:14px;border:1px solid var(--border);">
+              <div style="font-size:12px;font-weight:600;color:var(--orange);margin-bottom:8px;">Step 1 — Upload this file</div>
+              <code style="font-size:11px;color:var(--txt2);line-height:1.8;">Upload via FTP / cPanel:<br>/public_html/admin/index.html</code>
+            </div>
+            <div style="background:var(--bg3);border-radius:10px;padding:16px;margin-bottom:14px;border:1px solid var(--border);">
+              <div style="font-size:12px;font-weight:600;color:var(--orange);margin-bottom:8px;">Step 2 — Protect with .htaccess</div>
+              <code style="font-size:11px;color:var(--txt2);line-height:1.8;">AuthType Basic<br>AuthName "FitKart Admin"<br>AuthUserFile /path/.htpasswd<br>Require valid-user</code>
+            </div>
+            <div style="background:var(--bg3);border-radius:10px;padding:16px;border:1px solid var(--border);">
+              <div style="font-size:12px;font-weight:600;color:var(--orange);margin-bottom:8px;">Step 3 — Add to WordPress footer</div>
+              <code style="font-size:11px;color:var(--txt2);line-height:1.8;">&lt;a href="/admin/"&gt;Admin&lt;/a&gt;<br>in Company footer column</code>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Platform Settings</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+            <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">App Version (Forced Update)</label><input class="input" value="1.0.0"/></div>
+            <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Maintenance Mode</label><select class="input"><option>Off</option><option>On</option></select></div>
+            <div><label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px;">Max Referrals / User</label><input class="input" value="10"/></div>
+          </div>
+          <div style="margin-top:14px;"><button class="btn btn-primary">Save Settings</button></div>
+        </div>
+      </div>
+
+    </div><!-- content -->
+  </div><!-- main -->
+</div><!-- layout -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+
+// ── Supabase Configuration (auto-injected) ──────────────
+const SUPABASE_URL  = "https://qtdlwbtfwteidjldpyvf.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0ZGx3YnRmd3RlaWRqbGRweXZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MjA2NzcsImV4cCI6MjA4OTM5NjY3N30.yvUDAfZ_4aMOPvOOoqrbGZGWyd4upLu6P15sdwKxN4M";
+// Use these to wire admin API calls when ready
+
+// ══ LOGIN ════════════════════════════════════
+// ── Supabase client ──────────────────────────────────────
+const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+async function doLogin() {
+  const e = document.getElementById('login-email').value;
+  const p = document.getElementById('login-pass').value;
+  if (!e || !p) return;
+
+  // Show loading state
+  const btn = document.querySelector('#login-screen .btn-primary');
+  const origText = btn.textContent;
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+
+  try {
+    const { data, error } = await _supa.auth.signInWithPassword({ email: e, password: p });
+    if (error) {
+      alert('Login failed: ' + error.message);
+      btn.textContent = origText;
+      btn.disabled = false;
+      return;
+    }
+    // Logged in — show dashboard
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-shell').style.display = 'flex';
+    initCharts();
+    loadLiveData();
+  } catch(err) {
+    alert('Error: ' + err.message);
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+}
+
+// ── Live data loader ─────────────────────────────────────
+async function loadLiveData() {
+  try {
+    await Promise.all([
+      loadDashboardStats(),
+      loadRecentUsers(),
+      loadFraudAlerts(),
+      loadDonationStats(),
+    ]);
+  } catch(e) {
+    console.error('Live data error:', e);
+  }
+}
+
+async function loadDashboardStats() {
+  const session = (await _supa.auth.getSession()).data.session;
+  const headers = session ? {
+    'apikey': SUPABASE_ANON,
+    'Authorization': `Bearer ${session.access_token}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'count=exact',
+  } : { 'apikey': SUPABASE_ANON };
+
+  // Total users via REST
+  const profilesRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id`, {
+    headers: { ...headers, 'Prefer': 'count=exact' }
+  });
+  const userCount = parseInt(profilesRes.headers.get('content-range')?.split('/')[1] || '0');
+  const { count: userCount2 } = { count: userCount };
+
+  // Active today (users with step_events today)
+  const today = new Date().toISOString().split('T')[0];
+  const { count: activeToday } = await _supa
+    .from('step_events')
+    .select('*', { count: 'exact', head: true })
+    .eq('date', today);
+
+  // Total coins issued
+  const { data: walletData } = await _supa
+    .from('wallets')
+    .select('lifetime_earned');
+  const totalCoins = walletData
+    ? walletData.reduce((sum, w) => sum + (w.lifetime_earned || 0), 0)
+    : 0;
+
+  // Fraud flags (pending review)
+  const { count: fraudCount } = await _supa
+    .from('fraud_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('decision', 'SUSPEND');
+
+  // Update DOM
+  const fmt = (n) => n >= 1e6 ? (n/1e6).toFixed(2)+'M' :
+                     n >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(n);
+
+  const fmtCoins = (n) => n >= 1e9 ? (n/1e9).toFixed(1)+'B' :
+                          n >= 1e6 ? (n/1e6).toFixed(1)+'M' : fmt(n);
+
+  if (userCount !== null) {
+    const el = document.getElementById('c-users');
+    if (el) el.textContent = fmt(userCount);
+  }
+  if (activeToday !== null) {
+    const el = document.getElementById('c-active');
+    if (el) el.textContent = fmt(activeToday || 0);
+  }
+  // Update coins stat
+  const coinEl = document.querySelector('[data-stat="coins"]');
+  if (coinEl) coinEl.textContent = fmtCoins(totalCoins);
+
+  // Update fraud count
+  const fraudEl = document.querySelector('[data-stat="fraud"]');
+  if (fraudEl) {
+    fraudEl.textContent = fraudCount || 0;
+  }
+}
+
+async function loadRecentUsers() {
+  const { data: users } = await _supa
+    .from('profiles')
+    .select('id, name, city, level, created_at, is_suspended')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (!users || users.length === 0) return;
+
+  const tbody = document.getElementById('user-table');
+  if (!tbody) return;
+
+  tbody.innerHTML = users.map(u => {
+    const initials = (u.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2);
+    const colors = ['#2563EB','#EC4899','#8B5CF6','#10B981','#F59E0B','#EF4444'];
+    const color = colors[u.id.charCodeAt(0) % colors.length];
+    const timeAgo = getTimeAgo(new Date(u.created_at));
+    const statusBadge = u.is_suspended
+      ? '<span class="badge badge-red">Suspended</span>'
+      : '<span class="badge badge-green">Active</span>';
+    const action = u.is_suspended
+      ? '<button class="btn btn-danger btn-sm">Audit</button>'
+      : '<button class="btn btn-ghost btn-sm">View</button>';
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:10px;">
+        <div class="u-avatar" style="background:${color};color:#fff;">${initials}</div>
+        ${u.name || 'Unknown'}
+      </div></td>
+      <td>${u.city || '—'}</td>
+      <td>${timeAgo}</td>
+      <td>—</td>
+      <td>—</td>
+      <td>${statusBadge}</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadFraudAlerts() {
+  const { data: logs } = await _supa
+    .from('fraud_logs')
+    .select('id, user_id, cheat_types, risk_score, decision, created_at, profiles(name)')
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (!logs || logs.length === 0) return;
+
+  // Update fraud badge in sidebar
+  const badge = document.querySelector('.sb-badge:not(.orange)');
+  if (badge) badge.textContent = logs.length;
+}
+
+async function loadDonationStats() {
+  const { data: causes } = await _supa
+    .from('causes')
+    .select('title, current_coins, inr_raised');
+
+  if (!causes) return;
+
+  const totalInr = causes.reduce((s, c) => s + (c.inr_raised || 0), 0);
+  const fmt = (n) => '₹' + (n >= 100000 ? (n/100000).toFixed(1)+'L' :
+                            n >= 1000   ? (n/1000).toFixed(1)+'K'   : n.toFixed(0));
+
+  const donEl = document.querySelector('[data-stat="donations"]');
+  if (donEl) donEl.textContent = fmt(totalInr);
+}
+
+// ── All Users panel ──────────────────────────────────────
+async function loadUsersPanel() {
+  // Use Supabase auth admin API to fetch all users
+  const { data: authData } = await _supa.auth.admin ? 
+    { data: null } : { data: null };
+
+  // Fetch profiles via REST with current session (bypasses RLS for admin)
+  const session = (await _supa.auth.getSession()).data.session;
+  if (!session) return;
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=*,wallets(balance)&order=created_at.desc&limit=50`, {
+    headers: {
+      'apikey': SUPABASE_ANON,
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+  });
+  const users = await res.json();
+  const count = users.length;
+
+  if (!users || !Array.isArray(users)) return;
+
+  const tbody = document.querySelector('#panel-users .card tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = users.map(u => {
+    const initials = (u.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2);
+    const colors = ['#2563EB','#EC4899','#8B5CF6','#10B981','#F59E0B'];
+    const color = colors[u.id.charCodeAt(0) % colors.length];
+    const balance = u.wallets?.balance || 0;
+    const statusBadge = u.is_suspended
+      ? '<span class="badge badge-red">Suspended</span>'
+      : '<span class="badge badge-green">Active</span>';
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:10px;">
+        <div class="u-avatar" style="background:${color};color:#fff;">${initials}</div>
+        <div><div>${u.name || 'Unknown'}</div>
+        <div style="font-size:11px;color:var(--txt3);">${u.email || ''}</div></div>
+      </div></td>
+      <td>${u.phone || '—'}</td>
+      <td>${u.city || '—'}</td>
+      <td><span class="badge badge-blue">${u.level || 'Walker'}</span></td>
+      <td>—</td>
+      <td>${balance.toFixed(0)}</td>
+      <td>—</td>
+      <td>${statusBadge}</td>
+      <td><button class="btn btn-ghost btn-sm">Manage</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Fraud panel ──────────────────────────────────────────
+async function loadFraudPanel() {
+  const { data: logs } = await _supa
+    .from('fraud_logs')
+    .select('*, profiles(name)')
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (!logs) return;
+
+  const tbody = document.querySelector('#panel-fraud .card tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = logs.map(l => {
+    const name = l.profiles?.name || l.user_id?.slice(0,8) || 'Unknown';
+    const score = l.risk_score?.toFixed(0) || 0;
+    const pct = Math.min(100, score);
+    const barColor = score >= 85 ? '#EF4444' : score >= 60 ? '#FF6B00' : '#FBBF24';
+    const badgeClass = l.decision === 'SUSPEND' ? 'badge-red' :
+                       l.decision === 'BLOCK'   ? 'badge-orange' : 'badge-yellow';
+    const timeAgo = getTimeAgo(new Date(l.created_at));
+    return `<tr>
+      <td>${name}</td>
+      <td>${(l.cheat_types || []).join(', ')}</td>
+      <td><div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:60px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;"></div>
+        </div>${score}
+      </div></td>
+      <td>—</td>
+      <td>—</td>
+      <td>${timeAgo}</td>
+      <td><span class="badge ${badgeClass}">${l.decision}</span></td>
+      <td><button class="btn btn-ghost btn-sm">Review</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function getTimeAgo(date) {
+  const secs = Math.floor((new Date() - date) / 1000);
+  if (secs < 60)   return secs + 's ago';
+  if (secs < 3600) return Math.floor(secs/60) + 'm ago';
+  if (secs < 86400) return Math.floor(secs/3600) + 'h ago';
+  return Math.floor(secs/86400) + 'd ago';
+}
+
+// ══ NAVIGATION ══════════════════════════════
+function nav(panel, el) {
+  // Hide all panels
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  // Show target
+  const target = document.getElementById('panel-' + panel);
+  if (target) target.classList.add('active');
+  // Update sidebar
+  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+  // Init charts for panel
+  setTimeout(() => initPanelCharts(panel), 80);
+  // Load live data for specific panels
+  if (panel === 'users')  loadUsersPanel();
+  if (panel === 'fraud')  loadFraudPanel();
+  if (panel === 'dashboard') loadLiveData();
+}
+
+// ══ CHARTS ══════════════════════════════════
+const C = {
+  grid:  'rgba(255,255,255,0.05)',
+  tick:  '#535872',
+  font:  "'DM Sans', sans-serif",
+};
+
+const defaultOpts = (yMax) => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1E2235', titleColor: '#F0EDE8', bodyColor: '#8B8FA8', padding: 10, cornerRadius: 8 } },
+  scales: {
+    x: { grid: { color: C.grid }, ticks: { color: C.tick, font: { family: C.font, size: 11 } } },
+    y: { grid: { color: C.grid }, ticks: { color: C.tick, font: { family: C.font, size: 11 } }, max: yMax },
+  }
+});
+
+function mkLine(id, labels, data, color) {
+  const cv = document.getElementById(id);
+  if (!cv || cv._c) return;
+  cv._c = new Chart(cv, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ data, borderColor: color, borderWidth: 2.5, pointBackgroundColor: color, pointBorderColor: '#141720', pointBorderWidth: 2, pointRadius: 4, tension: 0.4, fill: true,
+        backgroundColor: ctx => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,200); g.addColorStop(0, color+'40'); g.addColorStop(1, color+'04'); return g; }
+      }]
+    },
+    options: defaultOpts(null)
+  });
+}
+
+function mkBar(id, labels, data, colors) {
+  const cv = document.getElementById(id);
+  if (!cv || cv._c) return;
+  cv._c = new Chart(cv, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors || '#FF6B00', borderRadius: 6, borderSkipped: false }]
+    },
+    options: defaultOpts(null)
+  });
+}
+
+function mkDoughnut(id, labels, data, colors) {
+  const cv = document.getElementById(id);
+  if (!cv || cv._c) return;
+  cv._c = new Chart(cv, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#141720', borderWidth: 3, hoverOffset: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      plugins: { legend: { position: 'right', labels: { color: '#8B8FA8', font: { family: C.font, size: 11 }, padding: 12, boxWidth: 10, boxHeight: 10 } }, tooltip: { backgroundColor: '#1E2235', titleColor: '#F0EDE8', bodyColor: '#8B8FA8', padding: 10, cornerRadius: 8 } }
+    }
+  });
+}
+
+const days30 = ['Mar 1','','','','Mar 5','','','','Mar 10','','','','Mar 15','','','','Mar 20','','','','Mar 25','','','','Mar 30','','','','Apr 1',''];
+const months = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+
+function initCharts() {
+  // Dashboard
+  mkLine('stepsChart', days30, [840,890,820,950,1020,980,1100,1050,990,1080,1150,1200,1180,1250,1300,1280,1350,1400,1380,1450,1500,1480,1550,1520,1600,1580,1650,1700,1680,1720], '#2563EB');
+  new Chart(document.getElementById('coinsChart'), {
+    type: 'bar',
+    data: {
+      labels: days30,
+      datasets: [
+        { label: 'Issued', data: [120,130,125,140,155,148,162,158,150,165,170,178,174,182,190,186,195,200,198,205,210,208,215,212,220,218,225,230,228,235], backgroundColor: '#FBBF24', borderRadius: 4, borderSkipped: false },
+        { label: 'Redeemed', data: [30,35,32,38,42,40,45,43,41,46,48,50,49,52,55,53,57,60,58,62,64,63,66,64,68,66,70,72,71,74], backgroundColor: '#10B981', borderRadius: 4, borderSkipped: false },
+      ]
+    },
+    options: { ...defaultOpts(null), plugins: { ...defaultOpts(null).plugins, legend: { display: true, labels: { color: '#8B8FA8', font: { family: C.font, size: 11 }, boxWidth: 10 } } } }
+  });
+}
+
+function initPanelCharts(panel) {
+  if (panel === 'analytics') {
+    mkLine('growthChart', months, [180,240,310,420,560,720,890,1100,1350,1680,2050,2410], '#FF6B00');
+    mkBar('cityChart', ['Mumbai','Delhi','Bengaluru','Pune','Chennai','Hyd','Kolkata'], [420,380,310,180,140,120,90], ['#2563EB','#EC4899','#10B981','#FBBF24','#8B5CF6','#FF6B00','#F59E0B']);
+    mkLine('dauChart', days30, [162,168,155,172,185,178,192,188,175,195,200,210,205,215,220,218,225,230,228,235,240,238,245,242,250,248,252,255,253,258], '#10B981');
+  }
+  if (panel === 'coins') {
+    new Chart(document.getElementById('ecoChart'), {
+      type: 'bar',
+      data: {
+        labels: months,
+        datasets: [
+          { label: 'Issued (M)', data: [4200,5100,6400,7800,9200,10800,12500,14200,16000,18400,21000,24200], backgroundColor: '#FBBF24', borderRadius: 4, borderSkipped: false },
+          { label: 'Redeemed (M)', data: [1100,1400,1800,2200,2700,3200,3800,4400,5100,5900,6800,7900], backgroundColor: '#10B981', borderRadius: 4, borderSkipped: false },
+        ]
+      },
+      options: { ...defaultOpts(null), plugins: { ...defaultOpts(null).plugins, legend: { display: true, labels: { color: '#8B8FA8', font: { family: C.font, size: 11 }, boxWidth: 10 } } } }
+    });
+  }
+  if (panel === 'fraud') {
+    mkDoughnut('fraudChart', ['Step Stuffing','GPS Spoofing','Bot Pattern','Device Farm','Sensor Manip','Collusion'], [34,21,18,12,9,6], ['#EF4444','#F59E0B','#8B5CF6','#EC4899','#2563EB','#10B981']);
+    mkBar('riskChart', ['0-29 (APPROVE)','30-59 (REVIEW)','60-84 (BLOCK)','85-100 (SUSPEND)'], [847200,38,12,14], [847200,38,12,14], ['#10B981','#FBBF24','#FF6B00','#EF4444']);
+  }
+  if (panel === 'donations') {
+    mkDoughnut('donChart', ['Stray Animals','Clean Water','Plant Forest'], [45,33,22], ['#EF4444','#2563EB','#10B981']);
+  }
+}
+
+// Auto-init dashboard charts after login
+setTimeout(() => {}, 100);
+
+// Live counter animation
+let activeCount = 2847;
+setInterval(() => {
+  activeCount += Math.floor(Math.random() * 6) - 2;
+  const el = document.querySelector('.tb-live');
+  if (el) el.innerHTML = '<div class="tb-live-dot"></div>Live · ' + activeCount.toLocaleString() + ' active';
+}, 3000);
+
+// Allow pressing Enter on login
+document.addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+</script>
+</body>
+</html>

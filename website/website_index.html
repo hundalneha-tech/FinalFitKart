@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="FitKart Club - Walk to earn FitKart Coins. India's #1 walking rewards app.">
+    <meta name="keywords" content="walking app, fitness tracker, step counter, health app, rewards, India">
+    <title>FitKart - Walk Your Way to Fitness & Rewards</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #028090;
+            --primary-dark: #015f6b;
+            --secondary: #00A896;
+            --accent: #f5576c;
+            --purple: #667eea;
+            --yellow: #fdcb6e;
+            --bg-light: #f8f9fa;
+            --bg-white: #ffffff;
+            --text-dark: #1a1a1a;
+            --text-gray: #666666;
+            --text-light: #999999;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-dark);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Navigation */
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .navbar.scrolled {
+            box-shadow: 0 4px 30px rgba(0,0,0,0.15);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-dark);
+            font-weight: 600;
+            transition: color 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .cta-btn {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .cta-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(2, 128, 144, 0.3);
+        }
+
+        .menu-toggle {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            gap: 5px;
+        }
+
+        .menu-toggle span {
+            width: 25px;
+            height: 3px;
+            background: var(--text-dark);
+            border-radius: 3px;
+            transition: all 0.3s ease;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #028090 0%, #00A896 100%);
+            padding: 6rem 2rem 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            top: -250px;
+            right: -250px;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            bottom: -150px;
+            left: -150px;
+        }
+
+        .hero-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-content h1 {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: white;
+            margin-bottom: 1.5rem;
+            line-height: 1.1;
+        }
+
+        .hero-content p {
+            font-size: 1.25rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            padding: 1rem 2rem;
+            background: white;
+            color: var(--primary);
+            border: none;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
+        .btn-secondary {
+            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            color: var(--primary);
+        }
+
+        .hero-image {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .phone-mockup {
+            width: 100%;
+            max-width: 400px;
+            filter: drop-shadow(0 20px 60px rgba(0,0,0,0.3));
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        /* Stats Section */
+        .stats {
+            padding: 4rem 2rem;
+            background: white;
+        }
+
+        .stats-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 3rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 1rem;
+            color: var(--text-gray);
+            font-weight: 600;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 6rem 2rem;
+            background: var(--bg-light);
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            color: var(--text-dark);
+        }
+
+        .section-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-gray);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-dark);
+        }
+
+        .feature-description {
+            color: var(--text-gray);
+            line-height: 1.8;
+        }
+
+        /* How It Works */
+        .how-it-works {
+            padding: 6rem 2rem;
+            background: white;
+        }
+
+        .steps-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 3rem;
+        }
+
+        .step-card {
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 900;
+            color: white;
+            margin: 0 auto 2rem;
+        }
+
+        .step-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .step-description {
+            color: var(--text-gray);
+            line-height: 1.8;
+        }
+
+        /* Rewards Section */
+        .rewards {
+            padding: 6rem 2rem;
+            background: linear-gradient(135deg, var(--purple) 0%, var(--accent) 100%);
+            color: white;
+        }
+
+        .rewards-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .rewards-content h2 {
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin-bottom: 1.5rem;
+        }
+
+        .rewards-content p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .rewards-list {
+            list-style: none;
+        }
+
+        .rewards-list li {
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .rewards-list li:last-child {
+            border-bottom: none;
+        }
+
+        .rewards-image {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .rewards-graphic {
+            font-size: 15rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* App Download */
+        .download {
+            padding: 6rem 2rem;
+            background: var(--bg-light);
+        }
+
+        .download-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .download-container h2 {
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin-bottom: 1.5rem;
+        }
+
+        .download-container p {
+            font-size: 1.2rem;
+            color: var(--text-gray);
+            margin-bottom: 2rem;
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .store-btn {
+            padding: 1rem 2rem;
+            background: black;
+            color: white;
+            border-radius: 12px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .store-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .store-icon {
+            font-size: 2rem;
+        }
+
+
+        .admin-link {
+            color: var(--primary) !important;
+            font-weight: 600;
+            font-size: 13px;
+            padding: 4px 10px;
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            display: inline-block;
+            margin-top: 4px;
+            transition: all 0.3s ease;
+        }
+        .admin-link:hover {
+            background: var(--primary) !important;
+            color: white !important;
+        }
+        /* Footer */
+        .footer {
+            background: var(--text-dark);
+            color: white;
+            padding: 4rem 2rem 2rem;
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 3rem;
+            margin-bottom: 3rem;
+        }
+
+        .footer-about h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .footer-about p {
+            color: rgba(255,255,255,0.7);
+            line-height: 1.8;
+        }
+
+        .footer-section h4 {
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+        }
+
+        .footer-links {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 0.75rem;
+        }
+
+        .footer-links a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--secondary);
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.5);
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .nav-links {
+                display: none;
+            }
+
+            .menu-toggle {
+                display: flex;
+            }
+
+            .hero-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .hero-content h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero-buttons {
+                justify-content: center;
+            }
+
+            .stats-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .steps-container {
+                grid-template-columns: 1fr;
+            }
+
+            .rewards-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .footer-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                🚶 FitKart Club
+            </div>
+            <ul class="nav-links">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#rewards">Rewards</a></li>
+                <li><a href="#brands">For Brands</a></li>
+                <li><a href="#corporates">For Corporates</a></li>
+                <li><a href="#download">Download</a></li>
+            </ul>
+            <a href="#download" class="cta-btn">Download App</a>
+            <div class="menu-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1>Walk Your Way to Fitness & Rewards</h1>
+                <p>India's #1 walking app that rewards you for every step. Track your fitness, earn coins, and redeem amazing rewards!</p>
+                <div class="hero-buttons">
+                    <button class="btn-primary">📱 Download Now</button>
+                    <button class="btn-secondary">▶️ Watch Demo</button>
+                </div>
+            </div>
+            <div class="hero-image">
+                <div class="phone-mockup">
+                    <svg width="300" height="600" viewBox="0 0 300 600">
+                        <!-- Phone Frame -->
+                        <rect x="10" y="10" width="280" height="580" rx="30" fill="#1a1a1a"/>
+                        <rect x="20" y="20" width="260" height="560" rx="25" fill="#f8f9fa"/>
+                        
+                        <!-- Notch -->
+                        <rect x="110" y="25" width="80" height="25" rx="12" fill="#1a1a1a"/>
+                        
+                        <!-- App Header -->
+                        <rect x="30" y="60" width="240" height="60" rx="15" fill="#028090"/>
+                        <text x="150" y="85" fill="white" font-size="16" font-weight="bold" text-anchor="middle">Welcome back! 👋</text>
+                        <text x="150" y="105" fill="rgba(255,255,255,0.8)" font-size="12" text-anchor="middle">Sunday, Feb 15, 2026</text>
+                        
+                        <!-- Stats Card -->
+                        <rect x="30" y="135" width="240" height="80" rx="12" fill="white"/>
+                        <text x="150" y="160" fill="#666" font-size="11" text-anchor="middle">Your Activity Score</text>
+                        <text x="150" y="190" fill="#028090" font-size="32" font-weight="bold" text-anchor="middle">72</text>
+                        <text x="150" y="210" fill="#fdcb6e" font-size="12" font-weight="600" text-anchor="middle">💪 Good</text>
+                        
+                        <!-- Metrics Grid -->
+                        <g>
+                            <!-- Steps Card -->
+                            <rect x="30" y="230" width="110" height="90" rx="12" fill="white"/>
+                            <text x="85" y="255" fill="#333" font-size="20" text-anchor="middle">👟</text>
+                            <text x="85" y="280" fill="#333" font-size="16" font-weight="bold" text-anchor="middle">7,842</text>
+                            <text x="85" y="298" fill="#666" font-size="10" text-anchor="middle">Steps</text>
+                            <rect x="40" y="305" width="90" height="4" rx="2" fill="#e0e0e0"/>
+                            <rect x="40" y="305" width="63" height="4" rx="2" fill="#028090"/>
+                            
+                            <!-- Calories Card -->
+                            <rect x="160" y="230" width="110" height="90" rx="12" fill="white"/>
+                            <text x="215" y="255" fill="#333" font-size="20" text-anchor="middle">🔥</text>
+                            <text x="215" y="280" fill="#333" font-size="16" font-weight="bold" text-anchor="middle">392</text>
+                            <text x="215" y="298" fill="#666" font-size="10" text-anchor="middle">Calories</text>
+                            <rect x="170" y="305" width="90" height="4" rx="2" fill="#e0e0e0"/>
+                            <rect x="170" y="305" width="70" height="4" rx="2" fill="#f5576c"/>
+                        </g>
+                        
+                        <g>
+                            <!-- Active Minutes Card -->
+                            <rect x="30" y="335" width="110" height="90" rx="12" fill="white"/>
+                            <text x="85" y="360" fill="#333" font-size="20" text-anchor="middle">⏱️</text>
+                            <text x="85" y="385" fill="#333" font-size="16" font-weight="bold" text-anchor="middle">48</text>
+                            <text x="85" y="403" fill="#666" font-size="10" text-anchor="middle">Minutes</text>
+                            <rect x="40" y="410" width="90" height="4" rx="2" fill="#e0e0e0"/>
+                            <rect x="40" y="410" width="72" height="4" rx="2" fill="#667eea"/>
+                            
+                            <!-- Heart Points Card -->
+                            <rect x="160" y="335" width="110" height="90" rx="12" fill="white"/>
+                            <text x="215" y="360" fill="#333" font-size="20" text-anchor="middle">❤️</text>
+                            <text x="215" y="385" fill="#333" font-size="16" font-weight="bold" text-anchor="middle">28</text>
+                            <text x="215" y="403" fill="#666" font-size="10" text-anchor="middle">Points</text>
+                            <rect x="170" y="410" width="90" height="4" rx="2" fill="#e0e0e0"/>
+                            <rect x="170" y="410" width="63" height="4" rx="2" fill="#e17055"/>
+                        </g>
+                        
+                        <!-- Challenges Section -->
+                        <rect x="30" y="440" width="240" height="70" rx="12" fill="white"/>
+                        <text x="40" y="460" fill="#333" font-size="11" font-weight="600">Active Challenges</text>
+                        <rect x="40" y="470" width="220" height="30" rx="8" fill="#f8f9fa"/>
+                        <text x="50" y="487" fill="#333" font-size="10" font-weight="600">🎯 February Step Challenge</text>
+                        <text x="50" y="497" fill="#666" font-size="8">Day 12 • 42% Complete</text>
+                        
+                        <!-- Bottom Navigation -->
+                        <rect x="30" y="525" width="240" height="50" rx="15" fill="white"/>
+                        <g>
+                            <circle cx="65" cy="550" r="15" fill="#028090" opacity="0.1"/>
+                            <text x="65" y="555" fill="#028090" font-size="18" text-anchor="middle">🏠</text>
+                            <text x="115" y="555" fill="#999" font-size="18" text-anchor="middle">📊</text>
+                            <text x="165" y="555" fill="#999" font-size="18" text-anchor="middle">🎁</text>
+                            <text x="215" y="555" fill="#999" font-size="18" text-anchor="middle">🛍️</text>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="stats-container">
+            <div class="stat-item">
+                <div class="stat-number">10M+</div>
+                <div class="stat-label">Active Users</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">100B+</div>
+                <div class="stat-label">Steps Tracked</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">₹50Cr+</div>
+                <div class="stat-label">Rewards Given</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">4.8★</div>
+                <div class="stat-label">App Rating</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-header">
+            <h2 class="section-title">Why Choose FitKart?</h2>
+            <p class="section-subtitle">Everything you need to track your fitness journey and earn rewards</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3 class="feature-title">Step Tracking</h3>
+                <p class="feature-description">Accurately track every step with our advanced algorithm. Monitor daily, weekly, and monthly progress.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🪙</div>
+                <h3 class="feature-title">Earn FitKart Coins (FKC)</h3>
+                <p class="feature-description">Get rewarded for staying active. Earn coins for every step you take and redeem them for amazing rewards.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3 class="feature-title">Challenges</h3>
+                <p class="feature-description">Join exciting challenges, compete with friends, and achieve your fitness goals together.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎁</div>
+                <h3 class="feature-title">Exclusive Rewards</h3>
+                <p class="feature-description">Redeem your coins for vouchers, products, and exclusive deals from top brands.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🏆</div>
+                <h3 class="feature-title">Leaderboards</h3>
+                <p class="feature-description">Compete with millions of users across India. Climb the ranks and become a walking champion!</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <h3 class="feature-title">Insights</h3>
+                <p class="feature-description">Get detailed analytics, health insights, and personalized recommendations to improve your fitness.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="section-header">
+            <h2 class="section-title">How It Works</h2>
+            <p class="section-subtitle">Start your fitness journey in 3 simple steps</p>
+        </div>
+        <div class="steps-container">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <h3 class="step-title">Download & Sign Up</h3>
+                <p class="step-description">Download FitKart from App Store or Play Store. Create your account in less than a minute.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <h3 class="step-title">Start Walking</h3>
+                <p class="step-description">Open the app and start walking! We'll automatically track your steps throughout the day.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <h3 class="step-title">Earn & Redeem</h3>
+                <p class="step-description">Earn FitKart Coins (FKC) for every step. Redeem them for exciting rewards and vouchers!</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Rewards Section -->
+    <section class="rewards" id="rewards">
+        <div class="rewards-container">
+            <div class="rewards-content">
+                <h2>Get Rewarded for Walking</h2>
+                <p>Every step counts! Earn FitKart Coins (FKC) and redeem them for:</p>
+                <ul class="rewards-list">
+                    <li>🎬 Movie & Entertainment Vouchers</li>
+                    <li>☕ Food & Beverage Coupons</li>
+                    <li>🛍️ Shopping & E-commerce Deals</li>
+                    <li>🏋️ Fitness & Wellness Products</li>
+                    <li>💰 Direct Bank Transfers</li>
+                    <li>🎁 Exclusive Brand Partnerships</li>
+                </ul>
+                <button class="btn-primary" style="margin-top: 2rem;">Start Earning Now</button>
+            </div>
+            <div class="rewards-image">
+                <div class="rewards-graphic">🎁</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- For Brands Section -->
+    <section class="brands" id="brands" style="padding: 6rem 2rem; background: white;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 3rem;">
+                <h2 style="font-size: 2.5rem; font-weight: 900; margin-bottom: 1rem;">Partner with FitKart</h2>
+                <p style="font-size: 1.3rem; color: var(--primary); font-weight: 700; margin-bottom: 1rem;">Reach 10M+ Active Users & Build Brand Love</p>
+                <p style="font-size: 1.1rem; color: var(--text-gray); max-width: 700px; margin: 0 auto;">Connect with India's most engaged fitness community. Create memorable brand experiences and drive meaningful customer engagement.</p>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-bottom: 4rem;">
+                <div style="text-align: center; padding: 2rem; background: var(--bg-light); border-radius: 16px;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🎯</div>
+                    <h4 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.75rem;">Targeted Reach</h4>
+                    <p style="color: var(--text-gray);">Access 10M+ health-conscious users actively engaging with our platform daily</p>
+                </div>
+                <div style="text-align: center; padding: 2rem; background: var(--bg-light); border-radius: 16px;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">💡</div>
+                    <h4 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.75rem;">Brand Visibility</h4>
+                    <p style="color: var(--text-gray);">Feature your products and services to highly engaged fitness enthusiasts</p>
+                </div>
+                <div style="text-align: center; padding: 2rem; background: var(--bg-light); border-radius: 16px;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🤝</div>
+                    <h4 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.75rem;">Custom Campaigns</h4>
+                    <p style="color: var(--text-gray);">Design tailored marketing campaigns with challenges, rewards, and promotions</p>
+                </div>
+                <div style="text-align: center; padding: 2rem; background: var(--bg-light); border-radius: 16px;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
+                    <h4 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.75rem;">Real-time Analytics</h4>
+                    <p style="color: var(--text-gray);">Track campaign performance with detailed insights and user engagement metrics</p>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 3rem;">
+                <h3 style="text-align: center; font-size: 2rem; font-weight: 900; margin-bottom: 2rem;">Partnership Opportunities</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+                    <div style="background: white; border: 2px solid var(--primary); padding: 2rem; border-radius: 16px;">
+                        <h4 style="font-size: 1.4rem; margin-bottom: 1rem; color: var(--primary);">🎁 Reward Partner</h4>
+                        <p style="margin-bottom: 1rem; color: var(--text-gray);">Offer your products/services as rewards. Users can redeem FitKart Coins (FKC) for your brand.</p>
+                        <ul style="list-style: none; padding: 0; color: var(--text-gray);">
+                            <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--border);">✓ Featured in reward store</li>
+                            <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--border);">✓ Direct customer acquisition</li>
+                            <li style="padding: 0.5rem 0;">✓ Performance-based model</li>
+                        </ul>
+                    </div>
+                    <div style="background: white; border: 2px solid var(--secondary); padding: 2rem; border-radius: 16px;">
+                        <h4 style="font-size: 1.4rem; margin-bottom: 1rem; color: var(--secondary);">📢 Campaign Partner</h4>
+                        <p style="margin-bottom: 1rem; color: var(--text-gray);">Run branded challenges and engage users with your marketing campaigns.</p>
+                        <ul style="list-style: none; padding: 0; color: var(--text-gray);">
+                            <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--border);">✓ Branded fitness challenges</li>
+                            <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--border);">✓ In-app promotions</li>
+                            <li style="padding: 0.5rem 0;">✓ Custom landing pages</li>
+                        </ul>
+                    </div>
+                    <div style="background: white; border: 2px solid var(--purple); padding: 2rem; border-radius: 16px;">
+                        <h4 style="font-size: 1.4rem; margin-bottom: 1rem; color: var(--purple);">🏢 Exclusive Partner</h4>
+                        <p style="margin-bottom: 1rem; color: var(--text-gray);">Become a category-exclusive brand partner with premium placement.</p>
+                        <ul style="list-style: none; padding: 0; color: var(--text-gray);">
+                            <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--border);">✓ Category exclusivity</li>
+                            <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--border);">✓ Prime app real estate</li>
+                            <li style="padding: 0.5rem 0;">✓ Co-branded initiatives</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: center;">
+                <button class="btn-primary">📧 Partner with Us</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- For Corporates Section -->
+    <section class="corporates" id="corporates" style="padding: 6rem 2rem; background: linear-gradient(135deg, #028090, #00A896); color: white;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 3rem;">
+                <h2 style="font-size: 2.5rem; font-weight: 900; margin-bottom: 1rem;">FitKart for Corporates</h2>
+                <p style="font-size: 1.3rem; margin-bottom: 1rem; opacity: 0.95;">Transform Employee Wellness with India's #1 Walking App</p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-bottom: 4rem;">
+                <div style="text-align: center; padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">💪</div>
+                    <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.75rem;">Healthier Employees</h3>
+                    <p style="opacity: 0.9;">Encourage physical activity and build a culture of wellness in your organization</p>
+                </div>
+                <div style="text-align: center; padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🎯</div>
+                    <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.75rem;">Boost Productivity</h3>
+                    <p style="opacity: 0.9;">Healthier employees are 27% more productive and take fewer sick days</p>
+                </div>
+                <div style="text-align: center; padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">👥</div>
+                    <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.75rem;">Team Building</h3>
+                    <p style="opacity: 0.9;">Foster team spirit with department challenges and friendly competitions</p>
+                </div>
+                <div style="text-align: center; padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📈</div>
+                    <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.75rem;">Measurable Impact</h3>
+                    <p style="opacity: 0.9;">Track engagement, participation, and wellness metrics with detailed analytics</p>
+                </div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.95); padding: 3rem; border-radius: 20px; margin-bottom: 3rem; color: var(--text-dark);">
+                <h3 style="text-align: center; font-size: 2rem; font-weight: 900; margin-bottom: 2rem; color: var(--primary);">Enterprise Features</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                    <div style="padding: 1.5rem; background: var(--bg-light); border-radius: 12px;">
+                        <h4 style="font-size: 1.2rem; margin-bottom: 0.75rem;">🏆 Custom Challenges</h4>
+                        <p style="color: var(--text-gray); font-size: 0.95rem;">Create company-wide or team-based walking challenges tailored to your goals</p>
+                    </div>
+                    <div style="padding: 1.5rem; background: var(--bg-light); border-radius: 12px;">
+                        <h4 style="font-size: 1.2rem; margin-bottom: 0.75rem;">📊 Admin Dashboard</h4>
+                        <p style="color: var(--text-gray); font-size: 0.95rem;">Comprehensive analytics to track employee participation and wellness trends</p>
+                    </div>
+                    <div style="padding: 1.5rem; background: var(--bg-light); border-radius: 12px;">
+                        <h4 style="font-size: 1.2rem; margin-bottom: 0.75rem;">🎁 Reward Programs</h4>
+                        <p style="color: var(--text-gray); font-size: 0.95rem;">Integrate company rewards or use our reward marketplace for employee redemptions</p>
+                    </div>
+                    <div style="padding: 1.5rem; background: var(--bg-light); border-radius: 12px;">
+                        <h4 style="font-size: 1.2rem; margin-bottom: 0.75rem;">🔐 Data Privacy</h4>
+                        <p style="color: var(--text-gray); font-size: 0.95rem;">Enterprise-grade security with GDPR compliance and data protection</p>
+                    </div>
+                    <div style="padding: 1.5rem; background: var(--bg-light); border-radius: 12px;">
+                        <h4 style="font-size: 1.2rem; margin-bottom: 0.75rem;">👨‍💼 Dedicated Support</h4>
+                        <p style="color: var(--text-gray); font-size: 0.95rem;">Account manager and 24/7 technical support for seamless implementation</p>
+                    </div>
+                    <div style="padding: 1.5rem; background: var(--bg-light); border-radius: 12px;">
+                        <h4 style="font-size: 1.2rem; margin-bottom: 0.75rem;">🎯 White-labeling</h4>
+                        <p style="color: var(--text-gray); font-size: 0.95rem;">Custom branding options to align with your company identity</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; margin-bottom: 3rem; text-align: center;">
+                <div style="padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px);">
+                    <div style="font-size: 3rem; font-weight: 900; margin-bottom: 0.5rem;">500+</div>
+                    <div style="opacity: 0.9;">Corporate Partners</div>
+                </div>
+                <div style="padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px);">
+                    <div style="font-size: 3rem; font-weight: 900; margin-bottom: 0.5rem;">2M+</div>
+                    <div style="opacity: 0.9;">Corporate Users</div>
+                </div>
+                <div style="padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px);">
+                    <div style="font-size: 3rem; font-weight: 900; margin-bottom: 0.5rem;">85%</div>
+                    <div style="opacity: 0.9;">Employee Engagement</div>
+                </div>
+                <div style="padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px);">
+                    <div style="font-size: 3rem; font-weight: 900; margin-bottom: 0.5rem;">4.9★</div>
+                    <div style="opacity: 0.9;">Corporate Rating</div>
+                </div>
+            </div>
+
+            <div style="text-align: center;">
+                <h3 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;">Ready to Transform Your Workplace Wellness?</h3>
+                <p style="font-size: 1.1rem; margin-bottom: 2rem; opacity: 0.9;">Join leading companies in India who trust FitKart for employee health</p>
+                <button class="btn-primary">📞 Schedule a Demo</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section class="download" id="download">
+        <div class="download-container">
+            <h2>Download FitKart Today</h2>
+            <p>Join millions of Indians who are walking their way to better health and amazing rewards!</p>
+            <div class="download-buttons">
+                <a href="#" class="store-btn">
+                    <span class="store-icon">📱</span>
+                    <div style="text-align: left;">
+                        <div style="font-size: 0.7rem; opacity: 0.8;">Download on the</div>
+                        <div style="font-size: 1.2rem;">App Store</div>
+                    </div>
+                </a>
+                <a href="#" class="store-btn">
+                    <span class="store-icon">▶️</span>
+                    <div style="text-align: left;">
+                        <div style="font-size: 0.7rem; opacity: 0.8;">Get it on</div>
+                        <div style="font-size: 1.2rem;">Google Play</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-about">
+                <h3>🚶 FitKart Club</h3>
+                <p>India's most loved walking rewards app. Walk, earn FitKart Coins (FKC), and redeem amazing perks.</p>
+            </div>
+            <div class="footer-section">
+                <h4>Product</h4>
+                <ul class="footer-links">
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#how-it-works">How It Works</a></li>
+                    <li><a href="#rewards">Rewards</a></li>
+                    <li><a href="#brands">For Brands</a></li>
+                    <li><a href="#corporates">For Corporates</a></li>
+                    <li><a href="#download">Download</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Company</h4>
+                <ul class="footer-links">
+                    <li><a href="#">About Us</a></li>
+                    <li><a href="#">Careers</a></li>
+                    <li><a href="#">Blog</a></li>
+                    <li><a href="#">Press</a></li>
+                    <li><a href="/fkadmin/index.html" class="admin-link">⚙ Admin Panel</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Support</h4>
+                <ul class="footer-links">
+                    <li><a href="#">Help Center</a></li>
+                    <li><a href="#">Privacy Policy</a></li>
+                    <li><a href="#">Terms of Service</a></li>
+                    <li><a href="#">Contact Us</a></li>
+                    <li><a href="/donate-stray-animals/" style="color:#f5576c;">🐾 Donate for Strays</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 FitKart Club. All rights reserved. Made with ❤️ in India</p>
+        </div>
+    </footer>
+
+    <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

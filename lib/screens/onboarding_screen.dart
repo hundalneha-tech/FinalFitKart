@@ -5,6 +5,7 @@
 // Step 6: Referral
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -33,6 +34,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _skip() => widget.onGetStarted();
 
   void _onAuthSuccess() => setState(() => _step = 2);
+
+  @override
+  void initState() {
+    super.initState();
+
+    // If user is already signed in when onboarding loads
+    // (e.g. returned from Google OAuth redirect), skip to profile step
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null && _step <= 1) {
+        setState(() => _step = 2);
+      }
+    });
+
+    // Listen for OAuth sign-in completing
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && mounted && _step <= 1) {
+        setState(() => _step = 2);
+      }
+    });
+  }
 
   void _saveProfile(Map<String, dynamic> data) {
     _profileData.addAll(data);
@@ -217,19 +239,33 @@ class _AuthScreenState extends State<_AuthScreen> with SingleTickerProviderState
   Future<void> _google() async {
     setState(() => _loading = true);
     try {
-      const webClientId = 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com';
-      const iosClientId = 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com';
-      final g = GoogleSignIn(clientId: iosClientId, serverClientId: webClientId);
+      if (kIsWeb) {
+        // Web browser: use Supabase OAuth redirect
+        await Supabase.instance.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: Uri.base.origin + '/',
+        );
+        setState(() => _loading = false);
+        return;
+      }
+      // Android / iOS: use native GoogleSignIn package
+      const webClientId = '38568298435-r70rvv0c2o0gmdmpaeo82a8bs0j1cvqm.apps.googleusercontent.com';
+      const androidClientId = '38568298435-34uhl679kp7gcfekvtba73l5860qisnb.apps.googleusercontent.com';
+      final g = GoogleSignIn(clientId: androidClientId, serverClientId: webClientId);
       final user = await g.signIn();
       if (user == null) { setState(() => _loading = false); return; }
       final auth = await user.authentication;
       if (auth.accessToken == null || auth.idToken == null) {
         _snack('Google auth failed', error: true); setState(() => _loading = false); return;
       }
-      await Supabase.instance.client.auth.signInWithIdToken(provider: OAuthProvider.google, idToken: auth.idToken!, accessToken: auth.accessToken!);
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: auth.idToken!,
+        accessToken: auth.accessToken!,
+      );
       widget.onSuccess();
     } on AuthException catch (e) { _snack(e.message, error: true);
-    } catch (_) { _snack('Google sign-in failed', error: true);
+    } catch (e) { _snack('Google error: \$e', error: true);
     } finally { if (mounted) setState(() => _loading = false); }
   }
 
