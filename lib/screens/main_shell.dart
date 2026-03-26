@@ -6,6 +6,8 @@ import 'social_screen.dart';
 import 'perks_screen.dart';
 import 'profile_screen.dart';
 import '../theme/app_theme.dart';
+import 'workout_session_screen.dart';
+import '../services/workout_session_manager.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -32,9 +34,21 @@ class _MainShellState extends State<MainShell> {
     BottomNavigationBarItem(icon: Icon(Icons.person_outline),     activeIcon: Icon(Icons.person_rounded),       label: 'Profile'),
   ];
 
+  void _openSession() {
+    final mgr = WorkoutSessionManager();
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => WorkoutSessionScreen(type: mgr.type)));
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: IndexedStack(index: _index, children: _screens),
+    body: Column(children: [
+      // Live session banner — shows on every tab when session is active
+      ListenableBuilder(
+        listenable: WorkoutSessionManager(),
+        builder: (_, __) => LiveSessionBanner(onTap: _openSession)),
+      Expanded(child: IndexedStack(index: _index, children: _screens)),
+    ]),
     bottomNavigationBar: Container(
       decoration: BoxDecoration(
         color: Colors.white,

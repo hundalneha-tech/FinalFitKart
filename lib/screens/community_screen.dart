@@ -1,241 +1,244 @@
 // lib/screens/community_screen.dart
+// Friends list from `friendships` table + activity feed
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
-import '../models/models.dart';
-import '../widgets/shared_widgets.dart';
 
-class CommunityScreen extends StatelessWidget {
+class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
+  @override State<CommunityScreen> createState() => _CommunityScreenState();
+}
+
+class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProviderStateMixin {
+  final _sb   = Supabase.instance.client;
+  late final TabController _tab = TabController(length: 2, vsync: this);
+
+  List<Map<String,dynamic>> _friends   = [];
+  List<Map<String,dynamic>> _requests  = [];
+  bool _loadingFriends = true;
+
+  final _searchC = TextEditingController();
+  List<Map<String,dynamic>> _searchResults = [];
+  bool _searching = false;
 
   @override
-  Widget build(BuildContext context) {
-    final friends   = Friend.mockList();
-    final challenge = Challenge.mockList().last; // Walk to the Moon
+  void initState() { super.initState(); _loadFriends(); }
 
-    return Scaffold(
-      backgroundColor: AppColors.scaffold,
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // ── Header ─────────────────────────────
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                children: [
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Community', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-                      Text('Connect and compete with friends', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                    ],
-                  )),
-                  IconButton(icon: const Icon(Icons.search, size: 24), onPressed: () {}),
-                ],
-              ),
-            )),
+  @override
+  void dispose() { _tab.dispose(); _searchC.dispose(); super.dispose(); }
 
-            // ── Global Challenge banner ─────────────
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _GlobalChallengeBanner(challenge: challenge),
-            )),
+  Future<void> _loadFriends() async {
+    setState(() => _loadingFriends = true);
+    final uid = _sb.auth.currentUser?.id;
+    if (uid == null) { setState(() => _loadingFriends = false); return; }
+    try {
+      final data = await _sb.from('friendships')
+          .select('*, friend:profiles!friendships_friend_id_fkey(id,name,level,total_steps)')
+          .eq('user_id', uid)
+          .order('created_at', ascending: false);
 
-            // ── Stats row ───────────────────────────
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: cardDecoration(),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: const [
-                    _CommunityStat(icon: Icons.people_alt_outlined, iconColor: AppColors.primary, value: '12', label: 'Friends'),
-                    _StatDivider(),
-                    _CommunityStat(icon: Icons.emoji_events_outlined, iconColor: AppColors.primary, value: '#4', label: 'Rank'),
-                    _StatDivider(),
-                    _CommunityStat(icon: Icons.favorite_outline, iconColor: AppColors.accent, value: '128', label: 'Cheers'),
-                  ],
-                ),
-              ),
-            )),
+      final accepted  = (data as List).where((f) => f['status'] == 'accepted').toList();
+      final pending   = data.where((f) => f['status'] == 'pending').toList();
 
-            // ── Active Friends ──────────────────────
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: SectionHeader(title: 'Active Friends', action: 'Find More'),
-            )),
-            SliverList(delegate: SliverChildBuilderDelegate(
-              (_, i) => _FriendTile(friend: friends[i]),
-              childCount: friends.length,
-            )),
-
-            // ── Recent Activity ─────────────────────
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: cardDecoration(),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Recent Activity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                        IconButton(icon: const Icon(Icons.history, size: 20, color: AppColors.textSecondary), onPressed: () {}),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _activityItem('RK', const Color(0xFF6366F1), 'Rahul K.', 'earned 50 coins', '🪙 ₹50', '2 mins ago'),
-                    const Divider(height: 16),
-                    _activityItem('SJ', const Color(0xFF10B981), 'Sarah J.', 'completed 10k steps', '🚶 10.2k', '15 mins ago'),
-                    const Divider(height: 16),
-                    _activityItem('AV', const Color(0xFF8B5CF6), 'Amit V.', 'reached a 30-day streak', '🔥 HOT', '1 hour ago'),
-                    const SizedBox(height: 10),
-                    OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 40),
-                        side: const BorderSide(color: AppColors.border),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      ),
-                      child: const Text('Show All Activity', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                    ),
-                  ],
-                ),
-              ),
-            )),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          ],
-        ),
-      ),
-    );
+      if (mounted) setState(() {
+        _friends  = List<Map<String,dynamic>>.from(accepted);
+        _requests = List<Map<String,dynamic>>.from(pending);
+        _loadingFriends = false;
+      });
+    } catch (_) { if (mounted) setState(() => _loadingFriends = false); }
   }
 
-  Widget _activityItem(String initials, Color color, String name, String action, String badge, String time) =>
-    Row(children: [
-      Container(width: 36, height: 36, decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child: Center(child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)))),
-      const SizedBox(width: 10),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        RichText(text: TextSpan(style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppColors.textPrimary), children: [
-          TextSpan(text: '$name ', style: const TextStyle(fontWeight: FontWeight.w700)),
-          TextSpan(text: action, style: const TextStyle(fontWeight: FontWeight.w400, color: AppColors.textSecondary)),
+  Future<void> _search(String q) async {
+    if (q.trim().isEmpty) { setState(() => _searchResults = []); return; }
+    setState(() => _searching = true);
+    final uid = _sb.auth.currentUser?.id;
+    try {
+      final data = await _sb.from('profiles')
+          .select('id, name, level, total_steps')
+          .ilike('name', '%${q.trim()}%')
+          .neq('id', uid ?? '')
+          .limit(10);
+      if (mounted) setState(() {
+        _searchResults = List<Map<String,dynamic>>.from(data);
+        _searching = false;
+      });
+    } catch (_) { if (mounted) setState(() => _searching = false); }
+  }
+
+  Future<void> _addFriend(String friendId) async {
+    final uid = _sb.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      await _sb.from('friendships').insert({
+        'user_id':   uid,
+        'friend_id': friendId,
+        'status':    'pending',
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Friend request sent! 👋'), backgroundColor: AppColors.green,
+        behavior: SnackBarBehavior.floating));
+    } catch (_) {}
+  }
+
+  String _initials(String name) {
+    final p = name.trim().split(' ');
+    return p.length >= 2 ? '${p[0][0]}${p[1][0]}'.toUpperCase() : (name.isNotEmpty ? name[0].toUpperCase() : '?');
+  }
+
+  String _fmtSteps(Map p) {
+    final s = (p['total_steps'] as num?)?.toInt() ?? 0;
+    return s > 999 ? '${(s/1000).toStringAsFixed(1)}k steps' : '$s steps';
+  }
+
+  static const _colors = [Color(0xFF6366F1), Color(0xFFF59E0B), Color(0xFF10B981), Color(0xFFEC4899), Color(0xFF2563EB)];
+  Color _color(String id) => _colors[id.hashCode.abs() % _colors.length];
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.scaffold,
+    appBar: AppBar(
+      backgroundColor: AppColors.scaffold, elevation: 0,
+      leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size:18, color:AppColors.textPrimary), onPressed: ()=>Navigator.pop(context)),
+      title: const Text('My Community', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+      bottom: TabBar(
+        controller: _tab, labelColor: AppColors.primary,
+        unselectedLabelColor: AppColors.textSecondary,
+        indicatorColor: AppColors.primary, indicatorWeight: 2,
+        labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700),
+        tabs: [
+          Tab(text: 'Friends (${_friends.length})'),
+          Tab(text: _requests.isEmpty ? 'Find Friends' : 'Find (${_requests.length} pending)'),
         ])),
-        Text(time, style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
-      ])),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(color: AppColors.coinBg, borderRadius: BorderRadius.circular(20)),
-        child: Text(badge, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-      ),
-    ]);
-}
+    body: TabBarView(controller: _tab, children: [
 
-// ── Global Challenge banner ───────────────────────────────────
-class _GlobalChallengeBanner extends StatelessWidget {
-  final Challenge challenge;
-  const _GlobalChallengeBanner({required this.challenge});
+      // ── TAB 1: Friends list ──────────────────────────────
+      _loadingFriends
+        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+        : RefreshIndicator(
+            color: AppColors.primary, onRefresh: _loadFriends,
+            child: _friends.isEmpty
+              ? _emptyFriends()
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  itemCount: _friends.length,
+                  itemBuilder: (_, i) {
+                    final f = _friends[i]['friend'] as Map<String,dynamic>? ?? {};
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: cardDecoration(),
+                      child: Row(children: [
+                        Container(width: 46, height: 46,
+                          decoration: BoxDecoration(color: _color(f['id']?.toString() ?? ''), shape: BoxShape.circle),
+                          child: Center(child: Text(_initials(f['name'] as String? ?? '?'),
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)))),
+                        const SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(f['name'] as String? ?? 'Unknown',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          Text(f['level'] as String? ?? 'Walker',
+                            style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                        ])),
+                        Text(_fmtSteps(f), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                      ]));
+                  })),
 
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(16)),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Global Challenge', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70)),
-        const SizedBox(height: 4),
-        Row(children: [
-          Expanded(child: Text(challenge.title,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white))),
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
-            child: const Icon(Icons.public, color: Colors.white, size: 18)),
-        ]),
-        const SizedBox(height: 10),
-        Text(challenge.globalProgress ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.yellow)),
-        const SizedBox(height: 6),
-        Row(children: [
-          Expanded(child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: 0.65, backgroundColor: Colors.white.withOpacity(0.2),
-              valueColor: const AlwaysStoppedAnimation(AppColors.yellow), minHeight: 6),
-          )),
-          const SizedBox(width: 12),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white, foregroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              elevation: 0,
-            ),
-            child: const Text('Join', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-          ),
-        ]),
-      ],
-    ),
-  );
-}
+      // ── TAB 2: Find Friends ──────────────────────────────
+      Column(children: [
+        // Search bar
+        Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Container(
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border)),
+            child: Row(children: [
+              const Padding(padding: EdgeInsets.only(left: 14),
+                child: Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20)),
+              Expanded(child: TextField(
+                controller: _searchC,
+                onChanged: _search,
+                style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  hintText: 'Search by name...',
+                  hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14)))),
+              if (_searching) const Padding(padding: EdgeInsets.only(right: 14),
+                child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))),
+            ]))),
 
-// ── Community stat item ───────────────────────────────────────
-class _CommunityStat extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String value, label;
-  const _CommunityStat({required this.icon, required this.iconColor, required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) => Column(children: [
-    Icon(icon, color: iconColor, size: 22),
-    const SizedBox(height: 4),
-    Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-    Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-  ]);
-}
-
-class _StatDivider extends StatelessWidget {
-  const _StatDivider();
-  @override
-  Widget build(BuildContext context) => Container(width: 1, height: 40, color: AppColors.borderLight);
-}
-
-// ── Friend tile ───────────────────────────────────────────────
-class _FriendTile extends StatelessWidget {
-  final Friend friend;
-  const _FriendTile({required this.friend});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-    child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: cardDecoration(),
-      child: Row(
-        children: [
-          AvatarCircle(name: friend.name, size: 46, showOnline: friend.isOnline),
-          const SizedBox(width: 12),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(friend.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-              StreakBadge(days: friend.streakDays),
-            ],
-          )),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('${friend.steps.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},')} steps',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
-              GestureDetector(
-                child: const Text('View', style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600))),
-            ],
-          ),
+        // Pending requests
+        if (_requests.isNotEmpty) ...[
+          Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+            child: Row(children: [
+              Text('Pending Requests (${_requests.length})',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            ])),
+          ..._requests.map((r) {
+            final f = r['friend'] as Map<String,dynamic>? ?? {};
+            return Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Container(padding: const EdgeInsets.all(12), decoration: cardDecoration(),
+                child: Row(children: [
+                  Container(width: 38, height: 38,
+                    decoration: BoxDecoration(color: _color(f['id']?.toString() ?? ''), shape: BoxShape.circle),
+                    child: Center(child: Text(_initials(f['name'] as String? ?? '?'),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)))),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(f['name'] as String? ?? '',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                  Text('Pending', style: TextStyle(fontSize: 11, color: const Color(0xFFB45309), fontWeight: FontWeight.w600)),
+                ])));
+          }),
         ],
-      ),
-    ),
+
+        // Search results
+        Expanded(child: _searchResults.isEmpty
+          ? _searchHint()
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+              itemCount: _searchResults.length,
+              itemBuilder: (_, i) {
+                final p = _searchResults[i];
+                return Container(margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12), decoration: cardDecoration(),
+                  child: Row(children: [
+                    Container(width: 42, height: 42,
+                      decoration: BoxDecoration(color: _color(p['id']?.toString() ?? ''), shape: BoxShape.circle),
+                      child: Center(child: Text(_initials(p['name'] as String? ?? '?'),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)))),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(p['name'] as String? ?? '',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      Text(p['level'] as String? ?? 'Walker',
+                        style: const TextStyle(fontSize: 11, color: AppColors.primary)),
+                    ])),
+                    GestureDetector(onTap: () => _addFriend(p['id'] as String),
+                      child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
+                        child: const Text('Add', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)))),
+                  ]));
+              })),
+      ]),
+    ]),
   );
+
+  Widget _emptyFriends() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+    const Text('👥', style: TextStyle(fontSize: 56)),
+    const SizedBox(height: 16),
+    const Text('No friends yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+    const SizedBox(height: 6),
+    const Text('Find friends to compete with!', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+    const SizedBox(height: 20),
+    ElevatedButton(
+      onPressed: () => _tab.animateTo(1),
+      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+      child: const Text('Find Friends', style: TextStyle(color: Colors.white))),
+  ]));
+
+  Widget _searchHint() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+    const Text('🔍', style: TextStyle(fontSize: 40)),
+    const SizedBox(height: 12),
+    const Text('Search by name', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+  ]));
 }

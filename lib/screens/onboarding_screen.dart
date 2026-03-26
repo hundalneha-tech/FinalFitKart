@@ -10,6 +10,8 @@ import 'package:flutter/services.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:health/health.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
 
@@ -33,7 +35,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _next() => setState(() => _step++);
   void _skip() => widget.onGetStarted();
 
-  void _onAuthSuccess() => setState(() => _step = 2);
+  void _onAuthSuccess() async {
+    // Check if existing user (has profile name set)
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid != null) {
+        final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('name, goal_steps')
+          .eq('id', uid)
+          .single();
+        // If they already have a name, they're an existing user — go to main app
+        if (profile['name'] != null && (profile['name'] as String).isNotEmpty) {
+          widget.onLogin(); // skip all onboarding steps
+          return;
+        }
+      }
+    } catch (_) {}
+    // New user — go through full onboarding
+    setState(() => _step = 2);
+  }
 
   @override
   void initState() {
@@ -64,10 +85,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _finishOnboarding() async {
     try {
       final uid = Supabase.instance.client.auth.currentUser?.id;
-      if (uid != null && _profileData.isNotEmpty) {
-        await Supabase.instance.client.from('profiles').update(_profileData).eq('id', uid);
+      if (uid != null) {
+        final data = Map<String, dynamic>.from(_profileData);
+        data['onboarding_completed'] = true;
+        data['updated_at'] = DateTime.now().toIso8601String();
+        // Update profile with all onboarding data
+        await Supabase.instance.client
+          .from('profiles')
+          .update(data)
+          .eq('id', uid);
+        // Ensure wallet exists
+        await Supabase.instance.client
+          .from('wallets')
+          .upsert({'user_id': uid, 'balance': 0, 'lifetime_earned': 0},
+            onConflict: 'user_id');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Onboarding save error: ' + e.toString());
+    }
     widget.onGetStarted();
   }
 
@@ -149,45 +184,68 @@ class _SlidesScreenState extends State<_SlidesScreen> {
         },
       )),
 
-      // Bottom content
-      Expanded(flex: 5, child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-        child: Column(children: [
+      // Bottom content — no flex, fixed layout to prevent overflow
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
           // Text
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
-            child: Column(key: ValueKey(_page), children: [
+            child: Column(key: ValueKey(_page), mainAxisSize: MainAxisSize.min, children: [
               Text(_slides[_page].title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary, height: 1.2)),
-              const SizedBox(height: 12),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, height: 1.2)),
+              const SizedBox(height: 8),
               Text(_slides[_page].subtitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.6)),
+                maxLines: 3, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5)),
             ]),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
           SmoothPageIndicator(controller: _ctrl, count: 3,
-            effect: const ExpandingDotsEffect(activeDotColor: AppColors.primary, dotColor: AppColors.border, dotHeight: 8, dotWidth: 8, expansionFactor: 3)),
-          const Spacer(),
+            effect: const ExpandingDotsEffect(activeDotColor: AppColors.primary, dotColor: AppColors.border, dotHeight: 7, dotWidth: 7, expansionFactor: 3)),
+          const SizedBox(height: 14),
 
           // Stats bar
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            decoration: BoxDecoration(color: AppColors.primaryBg, borderRadius: BorderRadius.circular(16)),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(color: AppColors.primaryBg, borderRadius: BorderRadius.circular(14)),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: const [
               _StatPill('2.4M+', 'Walkers'),
               _Divider(),
-              _StatPill('₹0.33', 'per FKC'),
+              _StatPill('₹0.25', 'per FKC'),
               _Divider(),
               _StatPill('50+', 'Brands'),
             ]),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
 
-          // CTA
-          PrimaryButton(label: 'Get Started — It\'s Free', onPressed: widget.onGetStarted),
-          const SizedBox(height: 12),
+          // CTA — redesigned button
+          GestureDetector(
+            onTap: widget.onGetStarted,
+            child: Container(
+              width: double.infinity, height: 56,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1D4ED8), Color(0xFFEC4899)],
+                  begin: Alignment.centerLeft, end: Alignment.centerRight),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFF2563EB).withOpacity(0.4),
+                    blurRadius: 16, offset: const Offset(0, 6))]),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
+                Text('🚶', style: TextStyle(fontSize: 20)),
+                SizedBox(width: 10),
+                Text("Get Started — It's Free",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                    color: Colors.white, letterSpacing: 0.3)),
+                SizedBox(width: 8),
+                Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 10),
           GestureDetector(
             onTap: widget.onLogin,
             child: RichText(text: const TextSpan(
@@ -197,9 +255,8 @@ class _SlidesScreenState extends State<_SlidesScreen> {
                 TextSpan(text: 'Log In', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
               ],
             ))),
-          const SizedBox(height: 8),
         ]),
-      )),
+      ),
     ])),
   );
 }
@@ -444,7 +501,7 @@ class _ProfileScreenState extends State<_ProfileScreen> {
         // Daily step goal
         const Text('Daily Step Goal', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
         const SizedBox(height: 6),
-        Text('${_goalSteps.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} steps = ~₹${(_goalSteps * 0.01 * 0.33).toStringAsFixed(2)}/day',
+        Text('${_goalSteps.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} steps = ~${(_goalSteps * 0.001).toStringAsFixed(1)} FKC/day',
           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: _goals.map((g) => GestureDetector(
@@ -601,7 +658,7 @@ class _BodyScreenState extends State<_BodyScreen> {
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Estimated daily earnings', style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-              Text('~100 FKC = ₹33 per day at 10k steps',
+              Text('~10 FKC = ₹2.50 per day (daily cap)',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             ])),
           ]),
@@ -621,7 +678,7 @@ class _BodyScreenState extends State<_BodyScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────
-// STEP 4 — HEALTH SYNC (Google Fit / Apple Health)
+// STEP 4 — PERMISSIONS (3 asks: Health, Activity, Location)
 // ─────────────────────────────────────────────────────────────
 class _HealthSyncScreen extends StatefulWidget {
   final VoidCallback onNext;
@@ -632,80 +689,363 @@ class _HealthSyncScreen extends StatefulWidget {
 }
 
 class _HealthSyncScreenState extends State<_HealthSyncScreen> {
-  bool _syncing = false;
-  bool _synced  = false;
+  int  _ask = 0;
+  bool _healthGranted   = false;
+  bool _activityGranted = false;
+  bool _locationGranted = false;
+  bool _loading  = false;
+  bool _confirmed = false; // shows tick confirmation before advancing
 
-  Future<void> _sync() async {
-    setState(() => _syncing = true);
-    await Future.delayed(const Duration(seconds: 2)); // Replace with real Health.requestAuthorization()
-    setState(() { _syncing = false; _synced = true; });
+  // ── shared: show confirmation then advance ──────────────────
+  Future<void> _showConfirmThenAdvance({
+    required bool granted,
+    required void Function(bool) setGranted,
+    required int nextAsk,
+    bool isLast = false,
+  }) async {
+    setGranted(granted);
+    setState(() { _loading = false; _confirmed = true; });
+    await Future.delayed(const Duration(milliseconds: 1400));
+    if (!mounted) return;
+    setState(() => _confirmed = false);
+    if (isLast) {
+      widget.onNext();
+    } else {
+      setState(() => _ask = nextAsk);
+    }
+  }
+
+  // ── Ask 1: Health Connect ───────────────────────────────────
+  Future<void> _requestHealth() async {
+    setState(() => _loading = true);
+    bool granted = false;
+    try {
+      if (!kIsWeb) {
+        final health = Health();
+        granted = await health.requestAuthorization([
+          HealthDataType.STEPS,
+          HealthDataType.DISTANCE_WALKING_RUNNING,
+          HealthDataType.ACTIVE_ENERGY_BURNED,
+        ], permissions: [
+          HealthDataAccess.READ,
+          HealthDataAccess.READ,
+          HealthDataAccess.READ,
+        ]);
+      } else { granted = true; }
+    } catch (_) { granted = false; }
+    await _showConfirmThenAdvance(
+      granted: granted,
+      setGranted: (v) => _healthGranted = v,
+      nextAsk: 1,
+    );
+  }
+
+  // ── Ask 2: Activity Recognition ─────────────────────────────
+  Future<void> _requestActivity() async {
+    setState(() => _loading = true);
+    bool granted = false;
+    try {
+      if (!kIsWeb) {
+        final status = await Permission.activityRecognition.request();
+        granted = status.isGranted;
+      } else { granted = true; }
+    } catch (_) { granted = false; }
+    await _showConfirmThenAdvance(
+      granted: granted,
+      setGranted: (v) => _activityGranted = v,
+      nextAsk: 2,
+    );
+  }
+
+  // ── Ask 3: Location ─────────────────────────────────────────
+  Future<void> _requestLocation() async {
+    setState(() => _loading = true);
+    bool granted = false;
+    try {
+      if (!kIsWeb) {
+        final status = await Permission.locationWhenInUse.request();
+        granted = status.isGranted;
+      } else { granted = true; }
+    } catch (_) { granted = false; }
+    await _showConfirmThenAdvance(
+      granted: granted,
+      setGranted: (v) => _locationGranted = v,
+      nextAsk: 0,
+      isLast: true,
+    );
+  }
+
+  String get _currentTitle {
+    if (_ask == 0) return 'Connect your health data';
+    if (_ask == 1) return 'Allow activity tracking';
+    return 'Enable location';
+  }
+
+  String get _currentEmoji {
+    if (_ask == 0) return '❤️';
+    if (_ask == 1) return '📡';
+    return '📍';
+  }
+
+  bool get _currentGranted {
+    if (_ask == 0) return _healthGranted;
+    if (_ask == 1) return _activityGranted;
+    return _locationGranted;
+  }
+
+  Color get _currentColor {
+    if (_ask == 0) return const Color(0xFFEF4444);
+    if (_ask == 1) return AppColors.primary;
+    return AppColors.green;
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.scaffold,
-    body: SafeArea(child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(children: [
-        _StepHeader(step: 3, total: 5, title: 'Connect Health', subtitle: 'Auto-sync your steps — no manual entry', onSkip: widget.onSkip),
-        const Spacer(),
+    body: SafeArea(child: Stack(children: [
+      AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        transitionBuilder: (child, anim) => SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1,0), end: Offset.zero)
+            .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          child: child),
+        child: _ask == 0 ? _buildAsk1() : _ask == 1 ? _buildAsk2() : _buildAsk3(),
+      ),
+      // ── Confirmation overlay ──────────────────────────────
+      if (_confirmed)
+        AnimatedOpacity(
+          opacity: _confirmed ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            color: Colors.black54,
+            child: Center(child: Container(
+              width: 200, padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24)),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  width: 72, height: 72,
+                  decoration: BoxDecoration(
+                    color: _currentGranted
+                      ? AppColors.green.withOpacity(0.1)
+                      : AppColors.red.withOpacity(0.1),
+                    shape: BoxShape.circle),
+                  child: Icon(
+                    _currentGranted ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                    color: _currentGranted ? AppColors.green : AppColors.red,
+                    size: 44)),
+                const SizedBox(height: 14),
+                Text(
+                  _currentGranted ? 'Connected!' : 'Skipped',
+                  style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w800,
+                    color: _currentGranted ? AppColors.green : AppColors.textSecondary)),
+                const SizedBox(height: 6),
+                Text(
+                  _currentGranted
+                    ? '$_currentEmoji $_currentTitle enabled'
+                    : 'You can enable this in Settings later',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5)),
+              ]),
+            )),
+          ),
+        ),
+    ])),
+  );
 
-        // Big icon
-        Container(width: 120, height: 120,
+  Widget _buildAsk1() => _PermissionPage(
+    key: const ValueKey('ask1'),
+    step: 1, total: 3,
+    emoji: '❤️',
+    color: const Color(0xFFEF4444),
+    title: 'Connect your health data',
+    subtitle: 'FitKart reads your health data to count steps and calculate earnings. Your data never leaves your device without your consent.',
+    items: const [
+      _PermItem(icon: Icons.directions_walk_rounded, label: 'Steps', sub: 'Count every step you take'),
+      _PermItem(icon: Icons.social_distance_rounded, label: 'Distance', sub: 'Track km walked or run'),
+      _PermItem(icon: Icons.local_fire_department_rounded, label: 'Calories', sub: 'Monitor energy burned'),
+    ],
+    btnLabel: 'Connect Health Data',
+    onAllow: _requestHealth,
+    onSkip: () => _showConfirmThenAdvance(
+      granted: false, setGranted: (v) => _healthGranted = v, nextAsk: 1),
+    loading: _loading,
+  );
+
+  Widget _buildAsk2() => _PermissionPage(
+    key: const ValueKey('ask2'),
+    step: 2, total: 3,
+    emoji: '📡',
+    color: AppColors.primary,
+    title: 'Allow activity tracking',
+    subtitle: "We use your phone's motion sensors to confirm you are genuinely walking. This keeps the platform fair for all users.",
+    items: const [
+      _PermItem(icon: Icons.sensors_rounded, label: 'Accelerometer', sub: 'Detects real walking movement'),
+      _PermItem(icon: Icons.screen_rotation_rounded, label: 'Gyroscope', sub: 'Confirms natural motion patterns'),
+      _PermItem(icon: Icons.verified_user_outlined, label: 'Anti-cheat validation', sub: 'Ensures fair rewards for everyone'),
+    ],
+    btnLabel: 'Allow Activity Tracking',
+    onAllow: _requestActivity,
+    onSkip: () => _showConfirmThenAdvance(
+      granted: false, setGranted: (v) => _activityGranted = v, nextAsk: 2),
+    loading: _loading,
+  );
+
+  Widget _buildAsk3() => _PermissionPage(
+    key: const ValueKey('ask3'),
+    step: 3, total: 3,
+    emoji: '📍',
+    color: AppColors.green,
+    title: 'Enable location',
+    subtitle: 'Location is optional but helps us verify your steps are real by checking GPS distance. It is never shared with advertisers.',
+    items: const [
+      _PermItem(icon: Icons.location_on_outlined, label: 'GPS distance check', sub: 'Confirms steps match distance traveled'),
+      _PermItem(icon: Icons.security_rounded, label: 'Fraud prevention', sub: 'Flags 50,000 steps with 0 km travel'),
+      _PermItem(icon: Icons.visibility_off_outlined, label: 'Private by default', sub: 'Never shared or sold'),
+    ],
+    btnLabel: 'Enable Location',
+    onAllow: _requestLocation,
+    onSkip: () => _showConfirmThenAdvance(
+      granted: false, setGranted: (v) => _locationGranted = v,
+      nextAsk: 0, isLast: true),
+    loading: _loading,
+    skipLabel: "Skip — I'll do this later",
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// REUSABLE PERMISSION PAGE WIDGET
+// ─────────────────────────────────────────────────────────────
+class _PermissionPage extends StatelessWidget {
+  final int step, total;
+  final String emoji, title, subtitle, btnLabel;
+  final String? skipLabel;
+  final Color color;
+  final List<_PermItem> items;
+  final VoidCallback onAllow, onSkip;
+  final bool loading;
+
+  const _PermissionPage({
+    super.key,
+    required this.step, required this.total,
+    required this.emoji, required this.title, required this.subtitle,
+    required this.btnLabel, required this.color, required this.items,
+    required this.onAllow, required this.onSkip, required this.loading,
+    this.skipLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    // Progress + skip
+    Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 16, 0),
+      child: Row(children: [
+        Expanded(child: ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: LinearProgressIndicator(
+            value: step / total,
+            backgroundColor: AppColors.border,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 5))),
+        const SizedBox(width: 10),
+        Text('$step/$total', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+        TextButton(
+          onPressed: onSkip,
+          child: const Text('Skip',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600))),
+      ]),
+    ),
+
+    // SingleChildScrollView prevents bottom overflow on smaller screens
+    Expanded(child: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Icon bubble
+        Container(
+          width: 68, height: 68,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF34D399), Color(0xFF059669)]),
-            shape: BoxShape.circle),
-          child: const Center(child: Text('🏃', style: TextStyle(fontSize: 56)))),
-        const SizedBox(height: 28),
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(20)),
+          child: Center(child: Text(emoji, style: const TextStyle(fontSize: 32)))),
+        const SizedBox(height: 16),
 
-        const Text('Sync with Health Apps', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.textPrimary, height: 1.2)),
-        const SizedBox(height: 12),
-        const Text('Connect Google Fit or Apple Health to automatically count every step you take — even in the background.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.6)),
-        const SizedBox(height: 32),
-
-        // Benefits
-        ...[
-          ('📍', 'Background tracking', 'Steps counted even when app is closed'),
-          ('🔋', 'Battery friendly', 'Uses system health APIs — no GPS drain'),
-          ('🔒', 'Private & secure', 'Data never leaves your device without consent'),
-        ].map((b) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Row(children: [
-            Container(width: 44, height: 44,
-              decoration: BoxDecoration(color: AppColors.greenBg, borderRadius: BorderRadius.circular(12)),
-              child: Center(child: Text(b.$1, style: const TextStyle(fontSize: 20)))),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(b.$2, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-              Text(b.$3, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            ])),
-          ]),
-        )),
-
-        const Spacer(),
-
-        if (_synced) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: AppColors.greenBg, borderRadius: BorderRadius.circular(16)),
-            child: Row(children: const [
-              Icon(Icons.check_circle, color: AppColors.green, size: 24),
-              SizedBox(width: 12),
-              Expanded(child: Text('Health connected! Steps will sync automatically.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.green))),
-            ])),
-          const SizedBox(height: 16),
-          PrimaryButton(label: 'Continue →', onPressed: widget.onNext),
-        ] else ...[
-          PrimaryButton(label: _syncing ? 'Connecting...' : 'Connect Health App', onPressed: _syncing ? null : _sync, loading: _syncing),
-          const SizedBox(height: 12),
-          TextButton(onPressed: widget.onSkip, child: const Text('Skip for now', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600))),
-        ],
+        Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary, height: 1.2)),
         const SizedBox(height: 8),
+        Text(subtitle, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5)),
+        const SizedBox(height: 20),
+
+        // Permission items
+        ...items.map((item) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border)),
+            child: Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(11)),
+                child: Icon(item.icon, color: color, size: 19)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                Text(item.sub, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              ])),
+              Icon(Icons.check_circle_outline, color: color.withOpacity(0.5), size: 18),
+            ]),
+          ))),
+
+        const SizedBox(height: 20),
+
+        // Gradient allow button
+        GestureDetector(
+          onTap: loading ? null : onAllow,
+          child: Container(
+            width: double.infinity, height: 54,
+            decoration: BoxDecoration(
+              gradient: loading ? null : const LinearGradient(
+                colors: [Color(0xFF1D4ED8), Color(0xFFEC4899)],
+                begin: Alignment.centerLeft, end: Alignment.centerRight),
+              color: loading ? AppColors.border : null,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: loading ? null : [
+                BoxShadow(color: const Color(0xFF1D4ED8).withOpacity(0.35),
+                  blurRadius: 14, offset: const Offset(0, 5))]),
+            child: Center(child: loading
+              ? const SizedBox(width: 22, height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation(Colors.white)))
+              : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(btnLabel,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                ])),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Skip text
+        Center(child: TextButton(
+          onPressed: onSkip,
+          child: Text(skipLabel ?? 'Skip for now',
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)))),
       ]),
     )),
-  );
+  ]);
+}
+
+class _PermItem {
+  final IconData icon;
+  final String label, sub;
+  const _PermItem({required this.icon, required this.label, required this.sub});
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -762,8 +1102,8 @@ class _RewardsScreenState extends State<_RewardsScreen> {
           child: Text('How FKC works', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary))),
         const SizedBox(height: 16),
         ...[
-          (Icons.directions_walk_rounded, AppColors.primary, '100 steps = 1 FKC', 'Walk anywhere — outdoors, treadmill, mall — all count'),
-          (Icons.account_balance_wallet_outlined, AppColors.accent, '1 FKC = ₹0.33', 'Coins have real monetary value — redeem or donate'),
+          (Icons.directions_walk_rounded, AppColors.primary, '1,000 steps = 1 FKC', 'Walk anywhere — outdoors, treadmill, mall — all count'),
+          (Icons.account_balance_wallet_outlined, AppColors.accent, '1 FKC = ₹0.25', 'Coins have real monetary value — redeem or donate'),
           (Icons.local_offer_outlined, AppColors.green, 'Redeem instantly', 'Exchange FKC for vouchers from 50+ top brands'),
           (Icons.trending_up_rounded, AppColors.yellow, '2× Boost available', 'Activate a daily boost to double your coin earnings'),
         ].map((item) => Padding(
@@ -896,7 +1236,9 @@ class _ReferralScreenState extends State<_ReferralScreen> {
                 Text(_myCode!, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.primary, letterSpacing: 2)),
                 const Spacer(),
                 Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF1D4ED8), Color(0xFFEC4899)]),
+                    borderRadius: BorderRadius.circular(8)),
                   child: const Text('Copy & Share', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white))),
               ])),
           ),
@@ -912,10 +1254,17 @@ class _ReferralScreenState extends State<_ReferralScreen> {
             Expanded(child: _Field(ctrl: _codeC, label: '', hint: 'Enter referral code', icon: Icons.card_giftcard_rounded,
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')), LengthLimitingTextInputFormatter(8)])),
             const SizedBox(width: 10),
-            ElevatedButton(
-              onPressed: _loading ? null : _applyCode,
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-              child: _loading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Apply', style: TextStyle(fontWeight: FontWeight.w700))),
+            GestureDetector(
+              onTap: _loading ? null : _applyCode,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF1D4ED8), Color(0xFFEC4899)]),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: const Color(0xFF1D4ED8).withOpacity(0.3), blurRadius: 8, offset: const Offset(0,3))]),
+                child: _loading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Apply', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)))),
           ]),
         ] else
           Container(
