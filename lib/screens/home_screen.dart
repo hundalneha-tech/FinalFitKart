@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'activity_history_screen.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/pedometer_service.dart';
@@ -23,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String,dynamic>? _wallet;
   int _liveSteps    = 0;
   bool _activating  = false;
+  List<double> _weeklyCoins = List.filled(7, 0.0); // Mon–Sun FKC earned
   StreamSubscription? _stepsSub;
 
   @override
@@ -58,6 +60,42 @@ class _HomeScreenState extends State<HomeScreen> {
         final w = p['wallets'];
         _wallet = w is List ? (w as List).firstOrNull : w;
       });
+    } catch (_) {}
+    await _loadWeeklyEarnings();
+  }
+
+  Future<void> _loadWeeklyEarnings() async {
+    final uid = _sb.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      // Get start of current week (Monday)
+      final now   = DateTime.now();
+      final monday = now.subtract(Duration(days: now.weekday - 1));
+      final start  = DateTime(monday.year, monday.month, monday.day);
+      final end    = start.add(const Duration(days: 7));
+
+      final data = await _sb.from('coin_transactions')
+          .select('amount, created_at')
+          .eq('user_id', uid)
+          .gt('amount', 0)  // earned only
+          .gte('created_at', start.toIso8601String())
+          .lt('created_at', end.toIso8601String());
+
+      final buckets = List.filled(7, 0.0);
+      for (final tx in data as List) {
+        final dt  = DateTime.tryParse(tx['created_at'] as String? ?? '')?.toLocal();
+        if (dt == null) continue;
+        final idx = (dt.weekday - 1).clamp(0, 6); // Mon=0 … Sun=6
+        buckets[idx] += (tx['amount'] as num?)?.toDouble() ?? 0;
+      }
+
+      // Normalise to 0.0–1.0 for chart height
+      final maxVal = buckets.reduce((a,b) => a>b?a:b);
+      final normalised = maxVal > 0
+          ? buckets.map((v) => (v / maxVal).clamp(0.0, 1.0)).toList()
+          : buckets;
+
+      if (mounted) setState(() => _weeklyCoins = normalised);
     } catch (_) {}
   }
 
@@ -192,6 +230,29 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           )),
 
+          // ── My Activity button ───────────────────────────────
+          SliverToBoxAdapter(child: Padding(
+            padding: const EdgeInsets.fromLTRB(16,14,16,0),
+            child: GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ActivityHistoryScreen())),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(18,14,18,14),
+                decoration: cardDecoration(),
+                child: Row(children: [
+                  Container(width: 44, height: 44,
+                    decoration: BoxDecoration(gradient: AppColors.grad, borderRadius: BorderRadius.circular(14)),
+                    child: const Center(child: Text('📊', style: TextStyle(fontSize: 22)))),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('My Activity', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    const Text('Day · Week · Month — Heart Points & Steps', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  ])),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 22),
+                ]),
+              ),
+            ),
+          )),
+
           // ── Weekly Earning Trend chart ──────────────────────
           SliverToBoxAdapter(child: Padding(
             padding: const EdgeInsets.fromLTRB(16,14,16,0),
@@ -199,10 +260,15 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(18),
               decoration: cardDecoration(),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Weekly Earning Trend', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                Row(children: [
+                  const Text('Weekly Earning Trend', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const Spacer(),
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(color: AppColors.primaryBg, borderRadius: BorderRadius.circular(20)),
+                    child: Text('This week', style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600))),
+                ]),
                 const SizedBox(height: 14),
-                _WeekChart(data: const [0.60,0.78,0.73,0.95,0.58,0.81,0.73],
-                  labels: const ['M','T','W','T','F','S','S']),
+                _WeekChart(data: _weeklyCoins, labels: const ['M','T','W','T','F','S','S'], todayIndex: DateTime.now().weekday - 1),
               ]),
             ),
           )),
@@ -320,21 +386,47 @@ class _PerkCard extends StatelessWidget {
 }
 
 class _WeekChart extends StatelessWidget {
-  final List<double> data; final List<String> labels;
-  const _WeekChart({required this.data, required this.labels});
-  @override Widget build(BuildContext context) => SizedBox(height: 100,
-    child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-      for (int i=0; i<data.length; i++) Expanded(child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3),
-        child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-          Expanded(child: Align(alignment: Alignment.bottomCenter,
-            child: FractionallySizedBox(heightFactor: data[i],
-              child: Container(decoration: BoxDecoration(
-                gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                  colors: [Color(0xFF3B82F6), Color(0xFF2563EB)]),
-                borderRadius: BorderRadius.circular(4)))))),
-          const SizedBox(height: 6),
-          Text(labels[i], style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-        ])))
-    ]));
+  final List<double> data;
+  final List<String> labels;
+  final int todayIndex;
+  const _WeekChart({required this.data, required this.labels, this.todayIndex = -1});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasData = data.any((v) => v > 0);
+    return Column(children: [
+      SizedBox(height: 100,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          for (int i=0; i<data.length; i++) Expanded(child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+              // Value label on top if has data
+              if (hasData && data[i] > 0)
+                const SizedBox(height: 2),
+              Expanded(child: Align(alignment: Alignment.bottomCenter,
+                child: FractionallySizedBox(
+                  heightFactor: data[i] > 0 ? data[i].clamp(0.05, 1.0) : 0.03,
+                  child: Container(decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                      colors: i == todayIndex
+                        ? [AppColors.accent, AppColors.accent.withOpacity(0.8)]
+                        : data[i] > 0
+                          ? [const Color(0xFF3B82F6), const Color(0xFF2563EB)]
+                          : [AppColors.border, AppColors.border]),
+                    borderRadius: BorderRadius.circular(4)))))),
+              const SizedBox(height: 6),
+              Text(labels[i], style: TextStyle(
+                fontSize: 11,
+                fontWeight: i == todayIndex ? FontWeight.w800 : FontWeight.w400,
+                color: i == todayIndex ? AppColors.primary : AppColors.textSecondary)),
+            ])))
+        ])),
+      if (!hasData) ...[
+        const SizedBox(height: 8),
+        const Text('No earnings yet this week — start walking!',
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+      ],
+    ]);
+  }
 }

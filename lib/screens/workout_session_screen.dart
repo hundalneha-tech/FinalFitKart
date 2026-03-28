@@ -124,7 +124,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen>
 
   void _startMapRefresh() {
     _mapRefreshTimer?.cancel();
-    _mapRefreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    _mapRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) { // Battery: 3s→10s
       if (!mounted || _mgr.isPaused) return;
       final pts = PedometerService().routePoints;
       if (pts.isEmpty) return;
@@ -177,14 +177,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen>
     _pulseCtrl.repeat(reverse: true);
   }
 
-  void _stop() {
-    HapticFeedback.heavyImpact();
-    _stepsSub?.cancel();
-    _minuteTimer?.cancel();
-    _mapRefreshTimer?.cancel();
-    _pulseCtrl.stop();
-    _showSummary();
-  }
+
 
   void _confirmStop() {
     showDialog(context: context, builder: (_) => AlertDialog(
@@ -202,16 +195,54 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen>
       ]));
   }
 
-  void _showSummary() {
-    final steps    = _mgr.steps;
-    final elapsed  = _mgr.elapsed;
-    final dist     = _mgr.distanceKm;
-    final calories = _mgr.calories;
-    final coins    = _mgr.coins;
-    final type     = _mgr.type;
-    final route    = List<LatLng>.from(_routePoints);
-    final moveMins = _moveMinutes;
+  void _stop() {
+    HapticFeedback.heavyImpact();
+    _stepsSub?.cancel();
+    _minuteTimer?.cancel();
+    _mapRefreshTimer?.cancel();
+    _pulseCtrl.stop();
+    _showSummaryWithHealthSync();
+  }
+
+  Future<void> _showSummaryWithHealthSync() async {
+    // Show loading indicator while syncing from Health Connect
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(mainAxisSize: MainAxisSize.min, children: [
+          CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+          SizedBox(width: 16),
+          Text('Syncing your activity data...'),
+        ]),
+      ),
+    );
+
+    // Capture session info before stopping
+    final sessionStart = _mgr.sessionStartTime ?? DateTime.now().subtract(Duration(seconds: _mgr.elapsed));
+    final sessionEnd   = DateTime.now();
+    final type         = _mgr.type;
+    final route        = List<LatLng>.from(_routePoints);
+
+    // Sync real data from Health Connect for the session window
+    final synced = await PedometerService().syncSessionData(sessionStart, sessionEnd);
+
     _mgr.stop();
+
+    // Close loading dialog
+    if (mounted) Navigator.of(context).pop();
+
+    // Calculate derived metrics from synced data
+    final steps    = synced['steps'] as int;
+    final elapsed  = synced['duration_seconds'] as int;
+    final dist     = (synced['distance_km'] as double);
+    final calories = (synced['calories'] as double);
+    final moveMins = elapsed ~/ 60; // real duration from health connect
+    final typeMult  = type == WorkoutType.run ? 1.5 : type == WorkoutType.cycle ? 0.8 : 1.0;
+    final coins    = (steps * 0.001 * typeMult).clamp(0.0, 10.0);
+
+    if (!mounted) return;
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
@@ -222,6 +253,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen>
         moveMinutes: moveMins, routePoints: route,
         onDone: () { Navigator.pop(context); Navigator.pop(context); },
       ));
+  }
+
+  void _showSummary() {
+    _showSummaryWithHealthSync();
   }
 
   // ── Computed metrics ─────────────────────────────────────────────────────
@@ -349,53 +384,6 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen>
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
     child: Column(children: [
 
-      // ── Timer card ───────────────────────────────────────
-      ScaleTransition(
-        scale: _pulseAnim,
-        child: Container(
-          width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [color, color.withOpacity(0.75)]),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 20, offset: const Offset(0,8))]),
-          child: Column(children: [
-            Text(_mgr.elapsedFormatted,
-              style: const TextStyle(fontSize: 52, fontWeight: FontWeight.w900, color: Colors.white)),
-            Text(_mgr.isPaused ? 'PAUSED' : 'ELAPSED TIME',
-              style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w700, letterSpacing: 1.5)),
-          ]))),
-      const SizedBox(height: 12),
-
-      // ── 6-metric grid ─────────────────────────────────────
-      Row(children: [
-        _LiveTile(emoji: '👟', value: _mgr.steps.toString(), label: 'Steps', color: color),
-        const SizedBox(width: 8),
-        _LiveTile(emoji: '⏱️', value: _activeTime, label: 'Active Time', color: AppColors.primary),
-        const SizedBox(width: 8),
-        _LiveTile(emoji: '📍', value: '${_mgr.distanceKm.toStringAsFixed(2)} km', label: 'Distance', color: AppColors.green),
-      ]),
-      const SizedBox(height: 8),
-      Row(children: [
-        _LiveTile(emoji: '🔥', value: '${_mgr.calories.toStringAsFixed(0)}', sublabel: 'kcal', label: 'Calories', color: const Color(0xFFF97316)),
-        const SizedBox(width: 8),
-        _LiveTile(emoji: '🏃', value: '$_moveMinutes', sublabel: 'min', label: 'Move Mins', color: const Color(0xFF7C3AED)),
-        const SizedBox(width: 8),
-        _LiveTile(emoji: '⚡', value: _pace, sublabel: _pace == '–' ? '' : 'min/km', label: 'Pace', color: AppColors.red,
-          extra: _pace == '–' ? '' : '$_speedKmh km/h'),
-      ]),
-      const SizedBox(height: 8),
-      Row(children: [
-        _LiveTile(emoji: '❤️', value: '$_heartPoints', sublabel: 'pts', label: 'Heart Points', color: AppColors.accent,
-          extra: _heartPoints >= 10 ? '✓ Active' : 'Goal: 10'),
-        const SizedBox(width: 8),
-        _LiveTile(emoji: '🪙', value: _mgr.coins.toStringAsFixed(2), sublabel: 'FKC', label: 'Coins', color: AppColors.yellow),
-        const SizedBox(width: 8),
-        _LiveTile(emoji: '₹', value: ((_mgr.coins) * 0.33).toStringAsFixed(2), sublabel: 'INR', label: 'Value', color: AppColors.green),
-      ]),
-      const SizedBox(height: 12),
-
       // ── Live Map ──────────────────────────────────────────
       Container(
         decoration: cardDecoration(),
@@ -446,6 +434,61 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen>
       const SizedBox(height: 8),
 
       // Info hint
+
+      const SizedBox(height: 12),
+
+      // ── Steps card ───────────────────────────────────────
+      ScaleTransition(
+        scale: _pulseAnim,
+        child: Container(
+          width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: [color, color.withOpacity(0.75)]),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 20, offset: const Offset(0,8))]),
+          child: Column(children: [
+            Text(
+              _mgr.steps >= 1000
+                ? '${(_mgr.steps / 1000).toStringAsFixed(1)}k'
+                : '${_mgr.steps}',
+              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.white)),
+            const Text('STEPS', style: TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w700, letterSpacing: 2.0)),
+            const SizedBox(height: 6),
+            Text(_mgr.isPaused ? '⏸ PAUSED' : '⏱ ${_mgr.elapsedFormatted}',
+              style: const TextStyle(fontSize: 13, color: Colors.white60, fontWeight: FontWeight.w600)),
+          ]))),
+      const SizedBox(height: 12),
+
+      // ── 6-metric grid ─────────────────────────────────────
+      Row(children: [
+        _LiveTile(emoji: '👟', value: _mgr.steps.toString(), label: 'Steps', color: color),
+        const SizedBox(width: 8),
+        _LiveTile(emoji: '⏱️', value: _activeTime, label: 'Active Time', color: AppColors.primary),
+        const SizedBox(width: 8),
+        _LiveTile(emoji: '📍', value: '${_mgr.distanceKm.toStringAsFixed(2)} km', label: 'Distance', color: AppColors.green),
+      ]),
+      const SizedBox(height: 8),
+      Row(children: [
+        _LiveTile(emoji: '🔥', value: '${_mgr.calories.toStringAsFixed(0)}', sublabel: 'kcal', label: 'Calories', color: const Color(0xFFF97316)),
+        const SizedBox(width: 8),
+        _LiveTile(emoji: '🏃', value: '$_moveMinutes', sublabel: 'min', label: 'Move Mins', color: const Color(0xFF7C3AED)),
+        const SizedBox(width: 8),
+        _LiveTile(emoji: '⚡', value: _pace, sublabel: _pace == '–' ? '' : 'min/km', label: 'Pace', color: AppColors.red,
+          extra: _pace == '–' ? '' : '$_speedKmh km/h'),
+      ]),
+      const SizedBox(height: 8),
+      Row(children: [
+        _LiveTile(emoji: '❤️', value: '$_heartPoints', sublabel: 'pts', label: 'Heart Points', color: AppColors.accent,
+          extra: _heartPoints >= 10 ? '✓ Active' : 'Goal: 10'),
+        const SizedBox(width: 8),
+        _LiveTile(emoji: '🪙', value: _mgr.coins.toStringAsFixed(2), sublabel: 'FKC', label: 'Coins', color: AppColors.yellow),
+        const SizedBox(width: 8),
+        _LiveTile(emoji: '₹', value: ((_mgr.coins) * 0.33).toStringAsFixed(2), sublabel: 'INR', label: 'Value', color: AppColors.green),
+      ]),
+      const SizedBox(height: 12),
+
       Container(padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(color: color.withOpacity(0.07), borderRadius: BorderRadius.circular(12)),
         child: Row(children: [

@@ -23,7 +23,7 @@ dependencies:
   google_sign_in: ^6.2.1
 
   # Step counting / Health
-  health: ^11.0.0
+  health: ^12.0.0
   pedometer: ^4.0.2
   sensors_plus: ^5.0.1
 
@@ -72,3 +72,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/

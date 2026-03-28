@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io' show Platform;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:health/health.dart';
 import '../theme/app_theme.dart';
@@ -690,6 +691,7 @@ class _HealthSyncScreen extends StatefulWidget {
 
 class _HealthSyncScreenState extends State<_HealthSyncScreen> {
   int  _ask = 0;
+  bool _batteryGranted = false;
   bool _healthGranted   = false;
   bool _activityGranted = false;
   bool _locationGranted = false;
@@ -726,7 +728,11 @@ class _HealthSyncScreenState extends State<_HealthSyncScreen> {
           HealthDataType.STEPS,
           HealthDataType.DISTANCE_WALKING_RUNNING,
           HealthDataType.ACTIVE_ENERGY_BURNED,
+          HealthDataType.TOTAL_CALORIES_BURNED,
+          HealthDataType.HEART_RATE,
         ], permissions: [
+          HealthDataAccess.READ,
+          HealthDataAccess.READ,
           HealthDataAccess.READ,
           HealthDataAccess.READ,
           HealthDataAccess.READ,
@@ -770,6 +776,27 @@ class _HealthSyncScreenState extends State<_HealthSyncScreen> {
     await _showConfirmThenAdvance(
       granted: granted,
       setGranted: (v) => _locationGranted = v,
+      nextAsk: 3,  // go to battery step
+    );
+  }
+
+  // ── Ask 4: Battery Optimization ────────────────────────────
+  Future<void> _requestBattery() async {
+    setState(() => _loading = true);
+    bool granted = false;
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        // Request exemption from battery optimization
+        // This allows background step counting without being killed
+        final status = await Permission.ignoreBatteryOptimizations.request();
+        granted = status.isGranted;
+      } else {
+        granted = true;
+      }
+    } catch (_) { granted = true; } // Non-critical — proceed even if fails
+    await _showConfirmThenAdvance(
+      granted: granted,
+      setGranted: (v) => _batteryGranted = v,
       nextAsk: 0,
       isLast: true,
     );
@@ -778,7 +805,8 @@ class _HealthSyncScreenState extends State<_HealthSyncScreen> {
   String get _currentTitle {
     if (_ask == 0) return 'Connect your health data';
     if (_ask == 1) return 'Allow activity tracking';
-    return 'Enable location';
+    if (_ask == 2) return 'Enable location';
+    return 'Optimise battery usage';
   }
 
   String get _currentEmoji {
@@ -809,7 +837,7 @@ class _HealthSyncScreenState extends State<_HealthSyncScreen> {
           position: Tween<Offset>(begin: const Offset(1,0), end: Offset.zero)
             .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
           child: child),
-        child: _ask == 0 ? _buildAsk1() : _ask == 1 ? _buildAsk2() : _buildAsk3(),
+        child: _ask == 0 ? _buildAsk1() : _ask == 1 ? _buildAsk2() : _ask == 2 ? _buildAsk3() : _buildAsk4(),
       ),
       // ── Confirmation overlay ──────────────────────────────
       if (_confirmed)
@@ -857,7 +885,7 @@ class _HealthSyncScreenState extends State<_HealthSyncScreen> {
 
   Widget _buildAsk1() => _PermissionPage(
     key: const ValueKey('ask1'),
-    step: 1, total: 3,
+    step: 1, total: 4,
     emoji: '❤️',
     color: const Color(0xFFEF4444),
     title: 'Connect your health data',
@@ -876,7 +904,7 @@ class _HealthSyncScreenState extends State<_HealthSyncScreen> {
 
   Widget _buildAsk2() => _PermissionPage(
     key: const ValueKey('ask2'),
-    step: 2, total: 3,
+    step: 2, total: 4,
     emoji: '📡',
     color: AppColors.primary,
     title: 'Allow activity tracking',
@@ -895,7 +923,7 @@ class _HealthSyncScreenState extends State<_HealthSyncScreen> {
 
   Widget _buildAsk3() => _PermissionPage(
     key: const ValueKey('ask3'),
-    step: 3, total: 3,
+    step: 3, total: 4,
     emoji: '📍',
     color: AppColors.green,
     title: 'Enable location',
@@ -909,9 +937,30 @@ class _HealthSyncScreenState extends State<_HealthSyncScreen> {
     onAllow: _requestLocation,
     onSkip: () => _showConfirmThenAdvance(
       granted: false, setGranted: (v) => _locationGranted = v,
-      nextAsk: 0, isLast: true),
+      nextAsk: 3),
     loading: _loading,
     skipLabel: "Skip — I'll do this later",
+  );
+
+  Widget _buildAsk4() => _PermissionPage(
+    key: const ValueKey('ask4'),
+    step: 4, total: 4,
+    emoji: '⚡',
+    color: AppColors.yellow,
+    title: 'Optimise battery usage',
+    subtitle: 'Allow FitKart to run in the background without being paused by Android battery saver. This ensures every step is counted even when your screen is off.',
+    items: const [
+      _PermItem(icon: Icons.directions_walk_rounded, label: 'Count steps all day', sub: 'Never miss a step even with screen off'),
+      _PermItem(icon: Icons.battery_saver_outlined, label: 'Smart power use', sub: 'Only activates sensors when you move'),
+      _PermItem(icon: Icons.sync_rounded, label: 'Reliable earnings', sub: 'FKC coins credited even in background'),
+    ],
+    btnLabel: 'Optimise Battery',
+    onAllow: _requestBattery,
+    onSkip: () => _showConfirmThenAdvance(
+      granted: false, setGranted: (v) => _batteryGranted = v,
+      nextAsk: 0, isLast: true),
+    loading: _loading,
+    skipLabel: "Skip — not recommended",
   );
 }
 

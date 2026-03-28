@@ -3,7 +3,11 @@
 // Any screen can check if a session is running and return to it
 
 import 'dart:async';
+import 'package:health/health.dart';
+import 'package:flutter/foundation.dart';
 import 'boost_service.dart';
+import 'workout_background_service.dart';
+import 'pedometer_service.dart';
 import 'package:flutter/foundation.dart';
 
 
@@ -36,6 +40,7 @@ class WorkoutSessionManager extends ChangeNotifier {
   double      _calories   = 0;
 
   Timer? _clockTimer;
+  DateTime? _sessionStartTime;
 
   // ── Getters ──────────────────────────────────────────────
   bool        get isActive    => _isActive;
@@ -46,6 +51,8 @@ class WorkoutSessionManager extends ChangeNotifier {
   double      get distanceKm  => _distanceKm;
   double      get coins       => _coins;
   double      get calories    => _calories;
+
+  DateTime? get sessionStartTime => _sessionStartTime;
 
   String get elapsedFormatted {
     final h = _elapsed ~/ 3600;
@@ -68,7 +75,9 @@ class WorkoutSessionManager extends ChangeNotifier {
     _distanceKm = 0;
     _coins    = 0;
     _calories = 0;
+    _sessionStartTime = DateTime.now();
     _startClock();
+    WorkoutBackgroundService().startForeground(type);
     notifyListeners();
   }
 
@@ -88,6 +97,8 @@ class WorkoutSessionManager extends ChangeNotifier {
     _isActive = false;
     _isPaused = false;
     _clockTimer?.cancel();
+    PedometerService().stopGps();
+    WorkoutBackgroundService().stopForeground();
     notifyListeners();
   }
 

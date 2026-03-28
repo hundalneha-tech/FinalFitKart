@@ -9,6 +9,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:health/health.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -50,6 +51,8 @@ class PedometerService {
   factory PedometerService() => _i;
   PedometerService._();
 
+  static const _healthChannel = MethodChannel('com.fitkart.app/health_connect');
+
   // Public streams
   final _stepsCtrl  = StreamController<int>.broadcast();
   final _motionCtrl = StreamController<MotionSample>.broadcast();
@@ -69,6 +72,25 @@ class PedometerService {
   List<GpsSample> get routePoints => List.unmodifiable(_gpsSamples);
   Position? get lastPosition => _lastPos;
 
+  // ── Battery: pause heavy sensors when app goes to background ─────────────
+  void pauseHeavySensors() {
+    _accelSub?.pause();
+    _gyroSub?.pause();
+    _gpsSub?.pause();
+  }
+
+  void resumeHeavySensors() {
+    _accelSub?.resume();
+    _gyroSub?.resume();
+    _gpsSub?.resume();
+  }
+
+  // Stop GPS entirely when not in a workout session (called by session manager)
+  void stopGps() {
+    _gpsSub?.cancel();
+    _gpsSub = null;
+  }
+
   // Buffers
   final List<MotionSample> _motionBuf = [];
   final List<GpsSample>    _gpsSamples = [];
@@ -85,6 +107,63 @@ class PedometerService {
   Timer? _batchTimer;
 
   bool _initialized = false;
+  bool _healthConnected = false;
+  bool get isHealthConnected => _healthConnected;
+
+
+  // ── Request Health Connect permissions via native Android SDK ────────────
+  // Uses MethodChannel → MainActivity.kt → PermissionController
+  // This is the CORRECT way — triggers the real Health Connect permission screen
+  Future<bool> requestHealthConnectPermissions() async {
+    if (kIsWeb) return false;
+    try {
+      // First check if already granted
+      final alreadyGranted = await _healthChannel.invokeMethod<bool>('checkPermissions') ?? false;
+      if (alreadyGranted) {
+        _healthConnected = true;
+        debugPrint('Health Connect: already granted ✅');
+        _initGoogleFitBackground();
+        return true;
+      }
+
+      // Request via native permission screen
+      final granted = await _healthChannel.invokeMethod<bool>('requestPermissions') ?? false;
+      _healthConnected = granted;
+
+      if (granted) {
+        debugPrint('Health Connect: permissions granted ✅');
+        _initGoogleFitBackground();
+      } else {
+        debugPrint('Health Connect: permissions denied — using raw pedometer');
+      }
+      return granted;
+    } catch (e) {
+      debugPrint('Health Connect native request error: $e — falling back to health package');
+      // Fallback: try via health package
+      return await _requestHealthPackageFallback();
+    }
+  }
+
+  Future<bool> _requestHealthPackageFallback() async {
+    try {
+      final health = Health();
+      final types = [
+        HealthDataType.STEPS,
+        HealthDataType.DISTANCE_WALKING_RUNNING,
+        HealthDataType.ACTIVE_ENERGY_BURNED,
+        HealthDataType.TOTAL_CALORIES_BURNED,
+        HealthDataType.HEART_RATE,
+      ];
+      final permissions = types.map((_) => HealthDataAccess.READ).toList();
+      final granted = await health.requestAuthorization(types, permissions: permissions);
+      _healthConnected = granted;
+      if (granted) _initGoogleFitBackground();
+      return granted;
+    } catch (e) {
+      debugPrint('Health package fallback error: $e');
+      return false;
+    }
+  }
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -96,12 +175,11 @@ class PedometerService {
 
     await _requestPermissions();
 
-    // Try Google Fit / Apple Health first, fall back to raw pedometer
-    final healthConnected = await _initGoogleFit();
-    if (!healthConnected) {
-      debugPrint('Google Fit unavailable — using raw pedometer');
-      _startRawPedometer();
-    }
+    // Always start raw pedometer for INSTANT per-step updates
+    _startRawPedometer();
+
+    // Request Health Connect permissions and start background sync
+    _initGoogleFitBackground();
 
     _initMotionSensors();
     await _initGps();
@@ -116,19 +194,23 @@ class PedometerService {
 
   // ── Google Fit (Android) / Apple Health (iOS) ─────────────────────────────
 
-  Future<bool> _initGoogleFit() async {
+  Future<void> _initGoogleFitBackground() async {
     try {
       final health = Health();
 
 final types = [
         HealthDataType.STEPS,
         HealthDataType.DISTANCE_WALKING_RUNNING,
+        HealthDataType.ACTIVE_ENERGY_BURNED,
+        HealthDataType.TOTAL_CALORIES_BURNED,
+        HealthDataType.HEART_RATE,
       ];
 
-      final granted = await health.requestAuthorization(types);
+      final permissions = types.map((_) => HealthDataAccess.READ).toList();
+      final granted = await health.requestAuthorization(types, permissions: permissions);
       if (!granted) {
-        debugPrint('Google Fit authorization denied');
-        return false;
+        debugPrint('Google Fit authorization denied — raw pedometer continues');
+        return;
       }
 
       _dataSource = defaultTargetPlatform == TargetPlatform.iOS
@@ -140,14 +222,12 @@ final types = [
       await _syncFromFit(health);
 
       // Sync every 30 seconds during active session
-      _syncTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      _syncTimer = Timer.periodic(const Duration(minutes: 3), (_) async { // Battery: 30s→3min
         await _syncFromFit(health);
       });
 
-      return true;
     } catch (e) {
-      debugPrint('Google Fit init error: $e');
-      return false;
+      debugPrint('Google Fit init error — raw pedometer continues: $e');
     }
   }
 
@@ -167,10 +247,12 @@ final types = [
         }
       }
 
-      if (total > 0) {
+      // Only update if Google Fit reports MORE steps than our live counter
+      // This corrects the total without resetting live session progress
+      if (total > _todaySteps) {
         _todaySteps = total;
         _stepsCtrl.add(total);
-        debugPrint('Google Fit steps: $total');
+        debugPrint('Google Fit correction: $total steps');
       }
 
       // Distance
@@ -194,12 +276,21 @@ final types = [
   // ── Raw pedometer fallback ────────────────────────────────────────────────
 
   void _startRawPedometer() {
+    _stepSub?.cancel();
     _dataSource = 'pedometer';
+    int? _pedometerBase;
+
     _stepSub = Pedometer.stepCountStream.listen(
       (event) {
-        if (_baseSteps == 0) _baseSteps = event.steps;
-        _todaySteps = event.steps - _baseSteps;
-        _stepsCtrl.add(_todaySteps);
+        // Set base on first reading or if steps reset (device reboot)
+        if (_pedometerBase == null || event.steps < (_pedometerBase ?? 0)) {
+          _pedometerBase = event.steps - _todaySteps; // preserve any existing count
+        }
+        final live = event.steps - (_pedometerBase ?? event.steps);
+        if (live >= 0 && live != _todaySteps) {
+          _todaySteps = live;
+          _stepsCtrl.add(_todaySteps); // fires on EVERY step
+        }
       },
       onError: (e) => debugPrint('Pedometer error: $e'),
     );
@@ -209,14 +300,14 @@ final types = [
 
   void _initMotionSensors() {
     _accelSub = accelerometerEventStream(
-      samplingPeriod: const Duration(milliseconds: 50),
+      samplingPeriod: const Duration(milliseconds: 500), // Battery: 50ms→500ms
     ).listen((e) {
       _lastAccel = e;
       _emitMotion();
     }, onError: (e) => debugPrint('Accel error: $e'));
 
     _gyroSub = gyroscopeEventStream(
-      samplingPeriod: const Duration(milliseconds: 50),
+      samplingPeriod: const Duration(milliseconds: 500), // Battery: 50ms→500ms
     ).listen((e) {
       _lastGyro = e;
     }, onError: (e) => debugPrint('Gyro error: $e'));
@@ -245,8 +336,8 @@ final types = [
 
       _gpsSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          distanceFilter: 20,
+          accuracy: LocationAccuracy.low, // Battery: medium→low
+          distanceFilter: 50,             // Battery: 20m→50m
         ),
       ).listen((pos) {
         if (_lastPos != null) {
@@ -270,7 +361,7 @@ final types = [
   // ── Batch upload ──────────────────────────────────────────────────────────
 
   void _startBatchUpload() {
-    _batchTimer = Timer.periodic(const Duration(minutes: 5), (_) => _upload());
+    _batchTimer = Timer.periodic(const Duration(minutes: 10), (_) => _upload()); // Battery: 5→10min
   }
 
   Future<void> _upload() async {
@@ -328,6 +419,81 @@ final types = [
       _todaySteps = mock; _distanceKm = dist;
       _stepsCtrl.add(mock);
     });
+  }
+
+
+  // ── Sync session data from Health Connect at session end ──────────────────
+  // Called at session stop to get accurate summary even if Dart was killed
+  Future<Map<String,dynamic>> syncSessionData(DateTime startTime, DateTime endTime) async {
+    final durationSecs = endTime.difference(startTime).inSeconds;
+    final result = <String,dynamic>{
+      'steps': _todaySteps,
+      'distance_km': _distanceKm,
+      'calories': _todaySteps * 0.04,
+      'duration_seconds': durationSecs,
+      'source': 'pedometer',
+    };
+
+    try {
+      final health = Health();
+      final types = [
+        HealthDataType.STEPS,
+        HealthDataType.DISTANCE_WALKING_RUNNING,
+        HealthDataType.ACTIVE_ENERGY_BURNED,
+        HealthDataType.TOTAL_CALORIES_BURNED,
+        HealthDataType.HEART_RATE,
+      ];
+
+      final permissions = types.map((_) => HealthDataAccess.READ).toList();
+      final granted = await health.requestAuthorization(types, permissions: permissions);
+      if (!granted) return result;
+
+      // Steps for this exact session window
+      final stepData = await health.getHealthDataFromTypes(
+        startTime: startTime, endTime: endTime,
+        types: [HealthDataType.STEPS]);
+      int sessionSteps = 0;
+      for (final d in stepData) {
+        if (d.value is NumericHealthValue) {
+          sessionSteps += (d.value as NumericHealthValue).numericValue.toInt();
+        }
+      }
+
+      // Distance
+      final distData = await health.getHealthDataFromTypes(
+        startTime: startTime, endTime: endTime,
+        types: [HealthDataType.DISTANCE_WALKING_RUNNING]);
+      double sessionDist = 0;
+      for (final d in distData) {
+        if (d.value is NumericHealthValue) {
+          sessionDist += (d.value as NumericHealthValue).numericValue;
+        }
+      }
+
+      // Calories
+      final calData = await health.getHealthDataFromTypes(
+        startTime: startTime, endTime: endTime,
+        types: [HealthDataType.ACTIVE_ENERGY_BURNED]);
+      double sessionCal = 0;
+      for (final d in calData) {
+        if (d.value is NumericHealthValue) {
+          sessionCal += (d.value as NumericHealthValue).numericValue;
+        }
+      }
+
+      if (sessionSteps > 0) {
+        result['steps']  = sessionSteps;
+        result['source'] = 'health_connect';
+      }
+      if (sessionDist > 0) result['distance_km'] = sessionDist / 1000;
+      if (sessionCal > 0)  result['calories']    = sessionCal;
+      result['duration_seconds'] = durationSecs;
+
+      debugPrint('Health session sync: ${result['steps']} steps, ${result['distance_km']}km, ${result['calories']}kcal, ${durationSecs}s');
+    } catch (e) {
+      debugPrint('Health session sync error: $e');
+    }
+    return result;
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────

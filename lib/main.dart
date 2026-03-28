@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/supabase_service.dart';
+import 'services/workout_background_service.dart';
 import 'services/pedometer_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/main_shell.dart';
@@ -17,6 +18,7 @@ void main() async {
     statusBarIconBrightness: Brightness.dark,
   ));
   await SupabaseService.init();
+  await WorkoutBackgroundService().init(); // foreground service for background workout
   runApp(const ProviderScope(child: FitKartApp()));
 }
 
@@ -102,7 +104,13 @@ class _AppWithPedometerState extends State<_AppWithPedometer> {
   @override
   void initState() {
     super.initState();
-    PedometerService().init();
+    _initServices();
+  }
+
+  Future<void> _initServices() async {
+    await PedometerService().init();
+    // Request Health Connect permissions on every launch — silently skips if already granted
+    await PedometerService().requestHealthConnectPermissions();
   }
 
   @override

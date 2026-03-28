@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
+import '../services/pedometer_service.dart';
 
-enum SettingsPage { personalInfo, withdrawal, donationPrefs, privacy }
+enum SettingsPage { personalInfo, withdrawal, donationPrefs, privacy, healthConnect }
 
 class SettingsScreen extends StatelessWidget {
   final SettingsPage page;
@@ -16,6 +17,7 @@ class SettingsScreen extends StatelessWidget {
       case SettingsPage.withdrawal:     return const _WithdrawalScreen();
       case SettingsPage.donationPrefs:  return const _DonationPrefsScreen();
       case SettingsPage.privacy:        return const _PrivacyScreen();
+      case SettingsPage.healthConnect:  return const _HealthConnectScreen();
     }
   }
 }
@@ -976,3 +978,175 @@ Widget _saveBtn(bool saving, VoidCallback onTap) => SizedBox(width: double.infin
     child: saving
       ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
       : const Text('Save Changes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white))));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. HEALTH CONNECT — connect and manage Health Connect permissions
+// ═══════════════════════════════════════════════════════════════════════════════
+class _HealthConnectScreen extends StatefulWidget {
+  const _HealthConnectScreen();
+  @override State<_HealthConnectScreen> createState() => _HealthConnectScreenState();
+}
+
+class _HealthConnectScreenState extends State<_HealthConnectScreen> {
+  static const _channel = MethodChannel('com.fitkart.app/health_connect');
+  bool _loading   = false;
+  bool _connected = false;
+  bool _available = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStatus();
+  }
+
+  Future<void> _checkStatus() async {
+    try {
+      final available = await _channel.invokeMethod<bool>('isAvailable') ?? false;
+      final granted   = available
+          ? (await _channel.invokeMethod<bool>('checkPermissions') ?? false)
+          : false;
+      if (mounted) setState(() { _available = available; _connected = granted; });
+    } catch (_) {
+      if (mounted) setState(() { _available = false; _connected = PedometerService().isHealthConnected; });
+    }
+  }
+
+  Future<void> _connect() async {
+    setState(() => _loading = true);
+    final granted = await PedometerService().requestHealthConnectPermissions();
+    if (mounted) setState(() { _connected = granted; _loading = false; });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(granted
+          ? '✅ Health Connect connected! Steps will now sync accurately.'
+          : '❌ Permission denied. Please allow in Health Connect app settings.'),
+        backgroundColor: granted ? AppColors.green : AppColors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.scaffold,
+    appBar: AppBar(
+      backgroundColor: AppColors.scaffold, elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textPrimary),
+        onPressed: () => Navigator.pop(context)),
+      title: const Text('Health Connect',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary))),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(children: [
+        // Status card
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: _connected ? AppColors.green.withOpacity(0.08) : AppColors.primaryBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _connected ? AppColors.green : AppColors.primary, width: 1.5)),
+          child: Column(children: [
+            Container(width: 72, height: 72,
+              decoration: BoxDecoration(
+                color: _connected ? AppColors.green : AppColors.primary,
+                shape: BoxShape.circle),
+              child: Center(child: Icon(
+                _connected ? Icons.favorite_rounded : Icons.health_and_safety_outlined,
+                color: Colors.white, size: 36))),
+            const SizedBox(height: 16),
+            Text(
+              _connected ? 'Health Connect Connected' : 'Connect Health Connect',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            const SizedBox(height: 8),
+            Text(
+              _connected
+                ? 'FitKart is reading your step data, distance, and calories from Health Connect.'
+                : 'Connect Health Connect so FitKart can accurately count your steps, distance and calories — even when the app is in the background.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5)),
+          ])),
+        const SizedBox(height: 20),
+
+        // What we read
+        Container(
+          padding: const EdgeInsets.all(16), decoration: cardDecoration(),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Data FitKart reads from Health Connect',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            const SizedBox(height: 12),
+            _HCItem(icon: Icons.directions_walk_rounded, color: AppColors.primary,
+              label: 'Steps', sub: 'Daily and session step counts'),
+            _HCItem(icon: Icons.social_distance_rounded, color: AppColors.green,
+              label: 'Distance', sub: 'Kilometers walked or run'),
+            _HCItem(icon: Icons.local_fire_department_rounded, color: const Color(0xFFF97316),
+              label: 'Calories burned', sub: 'Active and total energy expended'),
+            _HCItem(icon: Icons.monitor_heart_outlined, color: AppColors.accent,
+              label: 'Heart rate', sub: 'For Heart Points calculation'),
+          ])),
+        const SizedBox(height: 20),
+
+        // Connect button
+        if (!_connected) ...[
+          SizedBox(width: double.infinity, height: 56,
+            child: ElevatedButton(
+              onPressed: _loading ? null : _connect,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              child: _loading
+                ? const SizedBox(width: 20, height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('Connect Health Connect',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)))),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () {
+              // Open Health Connect app directly
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Open Health Connect app → App permissions → FitKart → Allow All'),
+                behavior: SnackBarBehavior.floating, duration: Duration(seconds: 5)));
+            },
+            child: const Text('Open Health Connect settings instead',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+        ] else ...[
+          SizedBox(width: double.infinity, height: 56,
+            child: ElevatedButton(
+              onPressed: _loading ? null : _connect,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.scaffold,
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              child: _loading
+                ? const SizedBox(width: 20, height: 20,
+                    child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2))
+                : const Text('Refresh Permissions',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)))),
+        ],
+
+        const SizedBox(height: 24),
+        const Text(
+          'Your health data is private and only used to calculate your steps and FKC earnings. It is never shared with third parties.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11, color: AppColors.textMuted, height: 1.5)),
+      ])));
+}
+
+class _HCItem extends StatelessWidget {
+  final IconData icon; final Color color; final String label, sub;
+  const _HCItem({required this.icon, required this.color, required this.label, required this.sub});
+  @override Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(children: [
+      Container(width: 36, height: 36,
+        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, color: color, size: 18)),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        Text(sub, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+      ])),
+      Icon(Icons.check_circle_rounded, color: color, size: 18),
+    ]));
+}

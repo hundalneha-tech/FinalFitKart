@@ -6,6 +6,7 @@ import 'social_screen.dart';
 import 'perks_screen.dart';
 import 'profile_screen.dart';
 import '../theme/app_theme.dart';
+import '../services/pedometer_service.dart';
 import 'workout_session_screen.dart';
 import '../services/workout_session_manager.dart';
 
@@ -15,8 +16,36 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Pause heavy sensors when app goes to background — saves battery
+  // But keep step counting alive if a workout session is active
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final sessionActive = WorkoutSessionManager().isActive;
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      if (!sessionActive) {
+        // No workout — pause everything
+        PedometerService().pauseHeavySensors();
+      }
+      // If workout is active, sensors stay running so steps are counted
+    } else if (state == AppLifecycleState.resumed) {
+      PedometerService().resumeHeavySensors();
+    }
+  }
 
   static const _screens = [
     HomeScreen(),

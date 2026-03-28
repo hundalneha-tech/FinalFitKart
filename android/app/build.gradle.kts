@@ -67,6 +67,12 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("androidx.multidex:multidex:2.0.1")
 
+    // ── Kotlin Coroutines (needed for Health Connect async checks) ──
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // ── Health Connect SDK ──────────────────────────────────
+    implementation("androidx.health.connect:connect-client:1.1.0-rc01")
+
     // ── Firebase BOM — keeps all Firebase versions in sync ──
     implementation(platform("com.google.firebase:firebase-bom:32.7.4"))
     implementation("com.google.firebase:firebase-messaging-ktx")

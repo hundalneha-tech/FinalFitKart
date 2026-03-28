@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_theme.dart';
 import '../services/pedometer_service.dart';
 import '../services/workout_session_manager.dart';
@@ -42,11 +43,19 @@ class _MoveScreenState extends State<MoveScreen> {
     _distanceKm = PedometerService().distanceKm;
     if (_todaySteps > 0) _sessionStart = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
+    int _lastMoveCheck = 0;
     _stepsSub = PedometerService().stepsStream.listen((steps) {
-      if (mounted) setState(() {
-        if (_sessionStart == 0 && steps > 0) {
-          _sessionStart = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        }
+      if (!mounted) return;
+      if (_sessionStart == 0 && steps > 0) {
+        _sessionStart = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+        _lastMoveCheck = steps;
+      }
+      // Count a move minute for every 60 steps walked
+      if (steps - _lastMoveCheck >= 60) {
+        _activeMinutes++;
+        _lastMoveCheck = steps;
+      }
+      setState(() {
         _todaySteps = steps;
         _distanceKm = PedometerService().distanceKm;
       });
@@ -119,7 +128,8 @@ class _MoveScreenState extends State<MoveScreen> {
   // Ring progress
   double get _goalProgress => (_todaySteps / 10000).clamp(0.0, 1.0);
   double get _outerArc     => _goalProgress;
-  double get _innerArc     => (_calories / 400).clamp(0.0, 1.0);
+  // Inner ring = Heart Points progress (goal: 10 pts/day)
+  double get _innerArc     => (_heartPoints / 10).clamp(0.0, 1.0);
 
   // Active time formatted
   String get _activeTimeLabel {
@@ -132,6 +142,7 @@ class _MoveScreenState extends State<MoveScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.scaffold,
     body: SafeArea(child: CustomScrollView(slivers: [
@@ -141,7 +152,7 @@ class _MoveScreenState extends State<MoveScreen> {
         padding: const EdgeInsets.fromLTRB(16,14,16,8),
         child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Keep Moving', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            const Text("Keep Moving", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             Row(children: [
               Container(width: 7, height: 7,
                 decoration: BoxDecoration(
@@ -149,7 +160,7 @@ class _MoveScreenState extends State<MoveScreen> {
                   shape: BoxShape.circle)),
               const SizedBox(width: 5),
               Text(
-                _mgr.isActive ? 'Session Active' : 'Live Tracking',
+                _mgr.isActive ? "Session Active" : "Live Tracking",
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                   color: _mgr.isActive ? AppColors.green : AppColors.primary)),
             ]),
@@ -178,94 +189,135 @@ class _MoveScreenState extends State<MoveScreen> {
                 size: const Size(210, 210),
                 painter: _RingPainter(outerArc: _outerArc, innerArc: _innerArc)),
               Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                // FitKart Tiger Mascot — SVG with transparent background
+                SvgPicture.asset(
+                  'assets/images/FitKart_Tiger_Mascot.svg',
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 2),
                 Text(
                   _todaySteps >= 1000
-                    ? '${(_todaySteps / 1000).toStringAsFixed(1)}k'
-                    : '$_todaySteps',
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
-                const Text('Steps', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text('${(_goalProgress * 100).toStringAsFixed(0)}% of goal',
-                  style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                    ? "${(_todaySteps / 1000).toStringAsFixed(1)}k"
+                    : "$_todaySteps",
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+                const Text("Steps Today", style: TextStyle(fontSize: 9, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                Text("${(_goalProgress * 100).toStringAsFixed(0)}% of goal",
+                  style: const TextStyle(fontSize: 9, color: AppColors.primary, fontWeight: FontWeight.w600)),
                 if (_mgr.isActive) ...[
-                  const SizedBox(height: 4),
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  const SizedBox(height: 2),
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(color: AppColors.green, borderRadius: BorderRadius.circular(20)),
-                    child: const Text('● LIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white))),
+                    child: const Text("● LIVE", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white))),
                 ],
               ]),
             ])),
 
             // Ring legend
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              _legendDot(AppColors.primary, 'Steps goal'),
+              _legendDot(AppColors.primary, "Steps goal"),
               const SizedBox(width: 16),
-              _legendDot(AppColors.accent, 'Calorie goal'),
+              _legendDot(AppColors.accent, "Heart Points"),
             ]),
+            const SizedBox(height: 14),
+
+            // ── Workout type selector ─────────────────────
+            Row(children: WorkoutType.values.map((t) {
+              final active = t == _selected;
+              final color  = _typeColor(t);
+              final label  = t == WorkoutType.walk ? "🚶 Walk" : t == WorkoutType.run ? "🏃 Run" : "🚴 Cycle";
+              final mult   = t == WorkoutType.run ? "1.5×" : t == WorkoutType.cycle ? "0.8×" : "1×";
+              return Expanded(child: Padding(
+                padding: EdgeInsets.only(right: t != WorkoutType.cycle ? 8 : 0),
+                child: GestureDetector(
+                  onTap: () => setState(() => _selected = t),
+                  child: AnimatedContainer(duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: active ? color : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: active ? color : AppColors.border)),
+                    child: Column(children: [
+                      Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                        color: active ? Colors.white : AppColors.textSecondary)),
+                      const SizedBox(height: 2),
+                      Text("$mult FKC", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                        color: active ? Colors.white.withOpacity(0.8) : AppColors.textMuted)),
+                    ])))));
+            }).toList()),
+            const SizedBox(height: 10),
+
+            // ── Start Workout Session button ──────────────
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => WorkoutSessionScreen(type: _selected))),
+              child: Container(
+                width: double.infinity, height: 54,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)]),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 12, offset: const Offset(0,4))]),
+                child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 24),
+                  SizedBox(width: 10),
+                  Text("Start Workout Session", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
+                ]),
+              )),
 
             const SizedBox(height: 16),
             const Divider(color: AppColors.borderLight, height: 1),
             const SizedBox(height: 16),
 
-            // ── 6-metric grid ────────────────────────────────
-            // Row 1: Active Time | Distance | Calories
+            // ── 6-metric grid ────────────────────────────
+            // Row 1: Active Time | Distance | Move Minutes
             Row(children: [
               _MetricTile(
-                emoji: '⏱️',
+                emoji: "⏱️",
                 value: _activeTimeLabel,
-                label: 'Active Time',
+                label: "Active Time",
                 bg: const Color(0xFFEFF6FF),
                 valueColor: AppColors.primary,
               ),
               const SizedBox(width: 8),
               _MetricTile(
-                emoji: '📍',
-                value: '${_distanceKm.toStringAsFixed(2)} km',
-                label: 'Distance',
+                emoji: "📍",
+                value: "${_distanceKm.toStringAsFixed(2)} km",
+                label: "Distance",
                 bg: const Color(0xFFECFDF5),
                 valueColor: AppColors.green,
               ),
               const SizedBox(width: 8),
               _MetricTile(
-                emoji: '🔥',
-                value: _calories.toStringAsFixed(0),
-                label: 'Calories',
-                sublabel: 'kcal',
-                bg: const Color(0xFFFFF7ED),
-                valueColor: const Color(0xFFF97316),
+                emoji: "🏃",
+                value: "$_activeMinutes",
+                label: "Move Mins",
+                sublabel: "min",
+                bg: const Color(0xFFF5F3FF),
+                valueColor: const Color(0xFF7C3AED),
               ),
             ]),
             const SizedBox(height: 8),
 
-            // Row 2: Move Minutes | Pace | Heart Points
+            // Row 2: Pace | Calories
             Row(children: [
               _MetricTile(
-                emoji: '🏃',
-                value: '$_activeMinutes',
-                label: 'Move Mins',
-                sublabel: 'min',
-                bg: const Color(0xFFF5F3FF),
-                valueColor: const Color(0xFF7C3AED),
-              ),
-              const SizedBox(width: 8),
-              _MetricTile(
-                emoji: '⚡',
+                emoji: "⚡",
                 value: _pace,
-                label: 'Pace',
-                sublabel: _pace == '–' ? '' : 'min/km',
+                label: "Pace",
+                sublabel: _pace == "–" ? "" : "min/km",
                 bg: const Color(0xFFFFF1F0),
                 valueColor: const Color(0xFFEF4444),
-                extraLine: _pace == '–' ? '' : '$_speedKmh km/h',
+                extraLine: _pace == "–" ? "" : "$_speedKmh km/h",
               ),
               const SizedBox(width: 8),
               _MetricTile(
-                emoji: '❤️',
-                value: '$_heartPoints',
-                label: 'Heart Pts',
-                sublabel: 'pts',
-                bg: const Color(0xFFFFF0F6),
-                valueColor: AppColors.accent,
-                extraLine: _heartPoints >= 10 ? '✓ Active' : 'Goal: 10',
+                emoji: "🔥",
+                value: _calories.toStringAsFixed(0),
+                label: "Calories",
+                sublabel: "kcal",
+                bg: const Color(0xFFFFF7ED),
+                valueColor: const Color(0xFFF97316),
               ),
             ]),
           ]),
@@ -281,15 +333,15 @@ class _MoveScreenState extends State<MoveScreen> {
           child: Row(children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
-                _mgr.isActive ? 'SESSION EARNINGS' : 'TODAY\'S EARNINGS',
+                _mgr.isActive ? "SESSION EARNINGS" : "TODAY'S EARNINGS",
                 style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
               const SizedBox(height: 4),
               Row(children: [
                 Container(width: 20, height: 20,
                   decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-                  child: const Center(child: Text('C', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)))),
+                  child: const Center(child: Text("C", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)))),
                 const SizedBox(width: 8),
-                Text('${_coinsEarned.toStringAsFixed(2)} FKC',
+                Text("${_coinsEarned.toStringAsFixed(2)} FKC",
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
               ]),
             ]),
@@ -297,67 +349,12 @@ class _MoveScreenState extends State<MoveScreen> {
             Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
               child: Column(children: [
-                Text('≈ ₹${_inrValue.toStringAsFixed(2)}',
+                Text("≈ ₹${_inrValue.toStringAsFixed(2)}",
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
-                const Text('Redeemable', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                const Text("Redeemable", style: TextStyle(fontSize: 10, color: Colors.white70)),
               ])),
           ]),
         ),
-      )),
-
-      // ── Quick Start ──────────────────────────────────────
-      SliverToBoxAdapter(child: Padding(
-        padding: const EdgeInsets.fromLTRB(16,0,16,12),
-        child: Column(children: [
-          Row(children: [
-            const Text('Quick Start', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            const Spacer(),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: AppColors.coinBg, borderRadius: BorderRadius.circular(20)),
-              child: Row(children: [
-                CoinDot(size: 14),
-                const SizedBox(width: 4),
-                const Text('1 FKC per 100 steps', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-              ])),
-          ]),
-          const SizedBox(height: 10),
-          Row(children: WorkoutType.values.map((t) {
-            final active = t == _selected;
-            final color  = _typeColor(t);
-            final label  = t == WorkoutType.walk ? '🚶 Walk' : t == WorkoutType.run ? '🏃 Run' : '🚴 Cycle';
-            final mult   = t == WorkoutType.run ? '1.5×' : t == WorkoutType.cycle ? '0.8×' : '1×';
-            return Expanded(child: Padding(
-              padding: EdgeInsets.only(right: t != WorkoutType.cycle ? 8 : 0),
-              child: GestureDetector(
-                onTap: () => setState(() => _selected = t),
-                child: AnimatedContainer(duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: active ? color : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: active ? color : AppColors.border)),
-                  child: Column(children: [
-                    Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                      color: active ? Colors.white : AppColors.textSecondary)),
-                    const SizedBox(height: 2),
-                    Text('$mult FKC', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
-                      color: active ? Colors.white.withOpacity(0.8) : AppColors.textMuted)),
-                  ])))));
-          }).toList()),
-          const SizedBox(height: 10),
-          GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => WorkoutSessionScreen(type: _selected))),
-            child: Container(
-              width: double.infinity, height: 50,
-              decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(14)),
-              child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
-                SizedBox(width: 6),
-                Text('Start Workout Session', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-              ]),
-            )),
-        ]),
       )),
 
       // ── Weekly Activity chart ────────────────────────────
@@ -368,14 +365,14 @@ class _MoveScreenState extends State<MoveScreen> {
           decoration: cardDecoration(),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              const Text('Weekly Activity', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              const Text("Weekly Activity", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const Spacer(),
-              const Text('This Week', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const Text("This Week", style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             ]),
             const SizedBox(height: 14),
             _BarChart(
               data: [7200, 9100, 8500, 11200, 6800, 9400, _todaySteps],
-              labels: const ['M','T','W','T','F','S','S']),
+              labels: const ["M","T","W","T","F","S","S"]),
           ]),
         ),
       )),
@@ -384,13 +381,13 @@ class _MoveScreenState extends State<MoveScreen> {
       SliverToBoxAdapter(child: Padding(
         padding: const EdgeInsets.fromLTRB(16,0,16,10),
         child: Row(children: [
-          const Text('Workout Buddies', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          const Text("Workout Buddies", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           const Spacer(),
-          const Text('See All', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+          const Text("See All", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
         ]),
       )),
-      SliverToBoxAdapter(child: _BuddyItem(initials: 'RS', color: const Color(0xFF6366F1), name: 'Rahul S.', activity: 'Walking now', dist: '0.8 km')),
-      SliverToBoxAdapter(child: _BuddyItem(initials: 'PK', color: const Color(0xFFF59E0B), name: 'Priya K.', activity: 'Cycling', dist: '1.2 km')),
+      SliverToBoxAdapter(child: _BuddyItem(initials: "RS", color: const Color(0xFF6366F1), name: "Rahul S.", activity: "Walking now", dist: "0.8 km")),
+      SliverToBoxAdapter(child: _BuddyItem(initials: "PK", color: const Color(0xFFF59E0B), name: "Priya K.", activity: "Cycling", dist: "1.2 km")),
       SliverToBoxAdapter(child: Padding(
         padding: const EdgeInsets.fromLTRB(16,8,16,20),
         child: Container(
@@ -398,9 +395,9 @@ class _MoveScreenState extends State<MoveScreen> {
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.border)),
           child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text('👥', style: TextStyle(fontSize: 15)),
+            Text("👥", style: TextStyle(fontSize: 15)),
             SizedBox(width: 6),
-            Text('Invite Friends', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            Text("Invite Friends", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           ])),
       )),
     ])),
@@ -412,7 +409,6 @@ class _MoveScreenState extends State<MoveScreen> {
     Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
   ]);
 }
-
 // ── Metric tile ───────────────────────────────────────────────────────────────
 class _MetricTile extends StatelessWidget {
   final String emoji, value, label;

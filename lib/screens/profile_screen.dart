@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
+import '../services/pedometer_service.dart';
 import 'wallet_history_screen.dart';
 import 'settings_screen.dart';
 
@@ -344,6 +345,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _SettingRow(icon: '❤️', label: 'Donation Preferences', sub: 'Causes you care about',
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen(page: SettingsPage.donationPrefs)))),
                 const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                _SettingRow(
+                  icon: '❤️‍🔥',
+                  label: 'Health Connect',
+                  sub: PedometerService().isHealthConnected ? 'Connected ✓' : 'Not connected — tap to fix',
+                  subColor: PedometerService().isHealthConnected ? AppColors.green : AppColors.red,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen(page: SettingsPage.healthConnect)))),
                 _SettingRow(icon: '🔒', label: 'Privacy & Security', sub: 'App lock, Data sharing',
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen(page: SettingsPage.privacy)))),
               ])),
@@ -352,13 +359,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // ── Upgrade + Sign Out ───────────────────────────
             SliverToBoxAdapter(child: Padding(
               padding: const EdgeInsets.fromLTRB(16,12,16,0),
-              child: Container(height: 50,
-                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(14)),
-                child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text('🌟', style: TextStyle(fontSize: 16)),
-                  SizedBox(width: 8),
-                  Text('Upgrade to Pro', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-                ])),
+              child: GestureDetector(
+                onTap: _showProDialog,
+                child: Container(height: 50,
+                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(14)),
+                  child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Text('🌟', style: TextStyle(fontSize: 16)),
+                    SizedBox(width: 8),
+                    Text('Upgrade to Pro', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                  ])),
+              ),
             )),
             SliverToBoxAdapter(child: Padding(
               padding: const EdgeInsets.fromLTRB(16,8,16,24),
@@ -537,8 +547,9 @@ class _DonateSheetState extends State<_DonateSheet> {
 // ── Shared sub-widgets ────────────────────────────────────────────────────────
 class _SettingRow extends StatelessWidget {
   final String icon, label, sub;
+  final Color? subColor;
   final VoidCallback? onTap;
-  const _SettingRow({required this.icon, required this.label, required this.sub, this.onTap});
+  const _SettingRow({required this.icon, required this.label, required this.sub, this.onTap, this.subColor});
 
   @override Widget build(BuildContext context) => Material(
     color: Colors.transparent,
@@ -554,7 +565,7 @@ class _SettingRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-            Text(sub,   style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            Text(sub,   style: TextStyle(fontSize: 11, color: subColor ?? AppColors.textSecondary)),
           ])),
           const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 16),
         ]))));
