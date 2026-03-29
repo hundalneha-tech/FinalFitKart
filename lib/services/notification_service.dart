@@ -1,67 +1,141 @@
 // lib/services/notification_service.dart
-// FCM push notifications + in-app notification feed from Supabase
-// 
-// SETUP REQUIRED (one-time):
-//   1. Go to firebase.google.com → create project → Add Android app
-//      Package name: com.fitkart.app
-//   2. Download google-services.json → place at android/app/google-services.json
-//   3. In android/build.gradle add: classpath 'com.google.gms:google-services:4.3.15'
-//   4. In android/app/build.gradle add: apply plugin: 'com.google.gms.google-services'
-//   5. In pubspec.yaml add:
-//        firebase_core: ^2.24.0
-//        firebase_messaging: ^14.7.10
-//        flutter_local_notifications: ^16.3.0
-//   6. In main.dart call: await NotificationService().init();
-
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+// Background message handler — must be top-level function
+@pragma('vm:entry-point')
+Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
+  debugPrint('FCM background: ${message.notification?.title}');
+}
 
 class NotificationService extends ChangeNotifier {
   static final NotificationService _i = NotificationService._();
   factory NotificationService() => _i;
   NotificationService._();
 
-  final _sb = Supabase.instance.client;
+  final _sb      = Supabase.instance.client;
+  final _fcm     = FirebaseMessaging.instance;
+  final _local   = FlutterLocalNotificationsPlugin();
+
+  static const _channelId   = 'fitkart_main';
+  static const _channelName = 'FitKart Notifications';
+
   int  _unreadCount = 0;
   bool _initialized = false;
-
   int  get unreadCount => _unreadCount;
 
   // ── Init ─────────────────────────────────────────────────
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
+
+    // 1. Register background handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+
+    // 2. Request permission (Android 13+ / iOS)
+    final settings = await _fcm.requestPermission(
+      alert: true, badge: true, sound: true, provisional: false);
+    debugPrint('FCM permission: ${settings.authorizationStatus}');
+
+    // 3. Set up local notification channel (Android)
+    const androidChannel = AndroidNotificationChannel(
+      _channelId, _channelName,
+      description: 'FitKart activity and social notifications',
+      importance: Importance.high,
+      playSound: true,
+    );
+    await _local
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(androidChannel);
+
+    // 4. Init local notifications plugin
+    const initSettings = InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(),
+    );
+    await _local.initialize(initSettings,
+        onDidReceiveNotificationResponse: _onLocalNotifTap);
+
+    // 5. Get & save FCM token
+    final token = await _fcm.getToken();
+    if (token != null) await _saveFcmToken(token);
+    _fcm.onTokenRefresh.listen(_saveFcmToken);
+
+    // 6. Foreground message handler — show local notification
+    FirebaseMessaging.onMessage.listen(_handleForeground);
+
+    // 7. Background tap handler
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
+
+    // 8. App opened from terminated via notification
+    final initial = await _fcm.getInitialMessage();
+    if (initial != null) _handleTap(initial);
+
+    // 9. Load unread count from DB
     await _loadUnreadCount();
 
-    // NOTE: Real FCM init goes here once Firebase is configured.
-    // Uncomment after adding Firebase dependencies:
-    //
-    // await Firebase.initializeApp();
-    // final messaging = FirebaseMessaging.instance;
-    //
-    // // Request permission (iOS + Android 13+)
-    // await messaging.requestPermission(alert: true, badge: true, sound: true);
-    //
-    // // Get FCM token and save to Supabase profiles
-    // final token = await messaging.getToken();
-    // if (token != null) await _saveFcmToken(token);
-    //
-    // // Handle foreground messages
-    // FirebaseMessaging.onMessage.listen(_handleForeground);
-    //
-    // // Handle background tap
-    // FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
+    debugPrint('FCM init complete, token: ${token?.substring(0, 20)}...');
   }
 
+  // ── Foreground: show as local notification ────────────────
+  Future<void> _handleForeground(RemoteMessage msg) async {
+    final notif = msg.notification;
+    if (notif == null) return;
+
+    await _local.show(
+      msg.hashCode,
+      notif.title,
+      notif.body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId, _channelName,
+          icon: '@mipmap/ic_launcher',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: const DarwinNotificationDetails(),
+      ),
+    );
+
+    // Increment badge
+    _unreadCount++;
+    notifyListeners();
+  }
+
+  // ── Tap handler ───────────────────────────────────────────
+  void _handleTap(RemoteMessage msg) {
+    debugPrint('FCM tap: ${msg.data}');
+    // Navigation handled by app based on msg.data['type']
+  }
+
+  void _onLocalNotifTap(NotificationResponse res) {
+    debugPrint('Local notif tapped: ${res.payload}');
+  }
+
+  // ── Save token to Supabase profiles ──────────────────────
+  Future<void> _saveFcmToken(String token) async {
+    final uid = _sb.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      await _sb.from('profiles').update({'fcm_token': token}).eq('id', uid);
+      debugPrint('FCM token saved');
+    } catch (e) {
+      debugPrint('Save FCM token error: $e');
+    }
+  }
+
+  // ── Unread count from Supabase ────────────────────────────
   Future<void> _loadUnreadCount() async {
     final uid = _sb.auth.currentUser?.id;
     if (uid == null) return;
     try {
       final res = await _sb.from('notifications')
           .select('id')
-          .eq('is_read', false)
-          .or('user_id.eq.$uid,user_id.is.null');
+          .eq('user_id', uid)
+          .eq('is_read', false);
       _unreadCount = (res as List).length;
       notifyListeners();
     } catch (_) {}
@@ -87,13 +161,5 @@ class NotificationService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  // Called from screens when they navigate back from notifications
   Future<void> refresh() => _loadUnreadCount();
-
-  // ── FCM token save (uncomment after Firebase setup) ───────
-  // Future<void> _saveFcmToken(String token) async {
-  //   final uid = _sb.auth.currentUser?.id;
-  //   if (uid == null) return;
-  //   await _sb.from('profiles').update({'fcm_token': token}).eq('id', uid);
-  // }
 }

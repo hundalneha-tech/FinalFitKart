@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme/app_theme.dart';
@@ -205,45 +206,60 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen>
   }
 
   Future<void> _showSummaryWithHealthSync() async {
-    // Show loading indicator while syncing from Health Connect
     if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
+
+    // Capture in-memory data FIRST (before stop clears it)
+    final sessionStart  = _mgr.sessionStartTime ?? DateTime.now().subtract(Duration(seconds: _mgr.elapsed));
+    final sessionEnd    = DateTime.now();
+    final type          = _mgr.type;
+    final route         = List<LatLng>.from(_routePoints);
+    final inMemSteps    = _mgr.steps;
+    final inMemElapsed  = _mgr.elapsed;
+    final inMemDist     = _mgr.distanceKm;
+    final inMemCalories = _mgr.calories;
+    final inMemCoins    = _mgr.coins;
+
+    // Show syncing dialog
+    showDialog(context: context, barrierDismissible: false,
       builder: (_) => const AlertDialog(
         content: Row(mainAxisSize: MainAxisSize.min, children: [
           CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
           SizedBox(width: 16),
-          Text('Syncing your activity data...'),
-        ]),
-      ),
-    );
+          Text('Syncing activity data...'),
+        ])));
 
-    // Capture session info before stopping
-    final sessionStart = _mgr.sessionStartTime ?? DateTime.now().subtract(Duration(seconds: _mgr.elapsed));
-    final sessionEnd   = DateTime.now();
-    final type         = _mgr.type;
-    final route        = List<LatLng>.from(_routePoints);
-
-    // Sync real data from Health Connect for the session window
+    // Sync from Health Connect
     final synced = await PedometerService().syncSessionData(sessionStart, sessionEnd);
 
     _mgr.stop();
-
-    // Close loading dialog
     if (mounted) Navigator.of(context).pop();
 
-    // Calculate derived metrics from synced data
-    final steps    = synced['steps'] as int;
-    final elapsed  = synced['duration_seconds'] as int;
-    final dist     = (synced['distance_km'] as double);
-    final calories = (synced['calories'] as double);
-    final moveMins = elapsed ~/ 60; // real duration from health connect
-    final typeMult  = type == WorkoutType.run ? 1.5 : type == WorkoutType.cycle ? 0.8 : 1.0;
+    // Use Health Connect data if better than in-memory, else fall back to in-memory
+    final hcSteps    = synced['steps'] as int;
+    final hcElapsed  = synced['duration_seconds'] as int;
+    final hcDist     = (synced['distance_km'] as num).toDouble();
+    final hcCalories = (synced['calories'] as num).toDouble();
+    final source     = synced['source'] as String? ?? 'pedometer';
+
+    // Take whichever is larger (Health Connect wins if it has more data)
+    final steps    = hcSteps    > inMemSteps    ? hcSteps    : inMemSteps;
+    final elapsed  = hcElapsed  > inMemElapsed  ? hcElapsed  : inMemElapsed;
+    final dist     = hcDist     > inMemDist     ? hcDist     : inMemDist;
+    final calories = hcCalories > inMemCalories ? hcCalories : inMemCalories;
+    final moveMins = elapsed ~/ 60;
+    final typeMult = type == WorkoutType.run ? 1.5 : type == WorkoutType.cycle ? 0.8 : 1.0;
     final coins    = (steps * 0.001 * typeMult).clamp(0.0, 10.0);
 
-    if (!mounted) return;
+    debugPrint('Session summary: steps=$steps, elapsed=${elapsed}s, dist=${dist}km, source=$source');
 
+    // Save session to Supabase
+    _saveSession(
+      type: type, steps: steps, elapsed: elapsed,
+      dist: dist, calories: calories, coins: coins,
+      sessionStart: sessionStart, sessionEnd: sessionEnd,
+    );
+
+    if (!mounted) return;
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent, isDismissible: false,
@@ -253,6 +269,55 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen>
         moveMinutes: moveMins, routePoints: route,
         onDone: () { Navigator.pop(context); Navigator.pop(context); },
       ));
+  }
+
+  Future<void> _saveSession({
+    required WorkoutType type, required int steps, required int elapsed,
+    required double dist, required double calories, required double coins,
+    required DateTime sessionStart, required DateTime sessionEnd,
+  }) async {
+    try {
+      final sb  = Supabase.instance.client;
+      final uid = sb.auth.currentUser?.id;
+      if (uid == null) return;
+
+      // Insert workout session
+      await sb.from('workout_sessions').insert({
+        'user_id':          uid,
+        'type':             type.name,
+        'steps':            steps,
+        'distance_km':      dist,
+        'duration_seconds': elapsed,
+        'calories':         calories,
+        'coins_earned':     coins,
+        'start_time':       sessionStart.toIso8601String(),
+        'end_time':         sessionEnd.toIso8601String(),
+      });
+
+      // Update total_steps on profile
+      await sb.rpc('increment_total_steps', params: {
+        'uid': uid, 'extra_steps': steps
+      }).catchError((_) async {
+        // Fallback: direct update if RPC doesn't exist
+        final p = await sb.from('profiles').select('total_steps').eq('id', uid).single();
+        final current = (p['total_steps'] as num?)?.toInt() ?? 0;
+        await sb.from('profiles').update({'total_steps': current + steps}).eq('id', uid);
+      });
+
+      // Credit coins via transact_coins RPC
+      if (coins > 0) {
+        await sb.rpc('transact_coins', params: {
+          'p_user_id':    uid,
+          'p_amount':     coins,
+          'p_type':       'EARN_WORKOUT',
+          'p_description': '${type.label} session — $steps steps',
+        });
+      }
+
+      debugPrint('Session saved: ${type.name}, $steps steps, $coins FKC');
+    } catch (e) {
+      debugPrint('Save session error: $e');
+    }
   }
 
   void _showSummary() {

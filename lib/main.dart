@@ -1,11 +1,13 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/supabase_service.dart';
 import 'services/workout_background_service.dart';
+import 'services/notification_service.dart';
 import 'services/pedometer_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/main_shell.dart';
@@ -17,8 +19,10 @@ void main() async {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
   ));
+  await Firebase.initializeApp();
   await SupabaseService.init();
   await WorkoutBackgroundService().init(); // foreground service for background workout
+  await NotificationService().init();       // FCM push notifications
   runApp(const ProviderScope(child: FitKartApp()));
 }
 

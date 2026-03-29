@@ -146,6 +146,19 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCN85Wx67fobzFTsT_LdNWzVBE142xOXL4"/>
 
+
+        <!-- Health Connect: rationale screen when user taps FitKart in HC settings -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE"/>
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS"/>
+            </intent-filter>
+        </activity-alias>
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>

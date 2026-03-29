@@ -24,6 +24,7 @@ class _SocialScreenState extends State<SocialScreen> {
   Set<String>               _joined      = {};
   bool _loadingC = true;
   bool _loadingL = true;
+  RealtimeChannel? _leaderboardChannel;
 
   @override
   void initState() {
@@ -31,10 +32,15 @@ class _SocialScreenState extends State<SocialScreen> {
     _notif.addListener(() { if (mounted) setState(() {}); });
     _loadChallenges();
     _loadLeaderboard();
+    _subscribeLeaderboard();
   }
 
   @override
-  void dispose() { _notif.removeListener(() {}); super.dispose(); }
+  void dispose() {
+    _notif.removeListener(() {});
+    _leaderboardChannel?.unsubscribe();
+    super.dispose();
+  }
 
   // ── Load challenges ──────────────────────────────────────
   Future<void> _loadChallenges() async {
@@ -77,6 +83,22 @@ class _SocialScreenState extends State<SocialScreen> {
       _leaderboard = List<Map<String,dynamic>>.from(data);
     } catch (_) {}
     if (mounted) setState(() => _loadingL = false);
+  }
+
+
+  // ── Realtime: auto-refresh leaderboard on any change ─────
+  void _subscribeLeaderboard() {
+    _leaderboardChannel = _sb
+        .channel('public:leaderboard_entries')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'leaderboard_entries',
+          callback: (payload) {
+            debugPrint('Leaderboard update detected — refreshing');
+            if (mounted) _loadLeaderboard();
+          })
+        .subscribe();
   }
 
   int _isoWeek(DateTime d) {
